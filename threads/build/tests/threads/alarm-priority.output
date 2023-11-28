@@ -1,0 +1,67 @@
+Kernel command line: -q run alarm-priority
+0 ~ 9fc00 1
+100000 ~ 13e0000 1
+Pintos booting with: 
+	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
+	ext_mem: 0x100000 ~ 0x13e0000 (Usable: 19,328 kB)
+Calibrating timer...  134,144,000 loops/s.
+Boot complete.
+Executing 'alarm-priority':
+(alarm-priority) begin
+----- thread_sleep (1)-----
+----- thread_sleep (2)-----
+----- thread_sleep (1)-----
+----- thread_sleep (2)-----
+----- thread_sleep (1)-----
+----- thread_sleep (2)-----
+----- thread_sleep (1)-----
+----- thread_sleep (2)-----
+----- thread_sleep (1)-----
+----- thread_sleep (2)-----
+----- thread_sleep (1)-----
+----- thread_sleep (2)-----
+----- thread_sleep (1)-----
+----- thread_sleep (2)-----
+----- thread_sleep (1)-----
+----- thread_sleep (2)-----
+----- thread_sleep (1)-----
+----- thread_sleep (2)-----
+----- thread_sleep (1)-----
+----- thread_sleep (2)-----
+----- thread_sleep (3)-----
+----- thread_sleep (end)-----
+(alarm-priority) Thread priority 25 woke up.
+----- thread_sleep (3)-----
+----- thread_sleep (end)-----
+(alarm-priority) Thread priority 24 woke up.
+----- thread_sleep (3)-----
+----- thread_sleep (end)-----
+(alarm-priority) Thread priority 23 woke up.
+----- thread_sleep (3)-----
+----- thread_sleep (end)-----
+(alarm-priority) Thread priority 22 woke up.
+----- thread_sleep (3)-----
+----- thread_sleep (end)-----
+(alarm-priority) Thread priority 21 woke up.
+----- thread_sleep (3)-----
+----- thread_sleep (end)-----
+(alarm-priority) Thread priority 30 woke up.
+----- thread_sleep (3)-----
+----- thread_sleep (end)-----
+(alarm-priority) Thread priority 29 woke up.
+----- thread_sleep (3)-----
+----- thread_sleep (end)-----
+(alarm-priority) Thread priority 28 woke up.
+----- thread_sleep (3)-----
+----- thread_sleep (end)-----
+(alarm-priority) Thread priority 27 woke up.
+----- thread_sleep (3)-----
+----- thread_sleep (end)-----
+(alarm-priority) Thread priority 26 woke up.
+(alarm-priority) end
+Execution of 'alarm-priority' complete.
+Timer: 543 ticks
+Thread: 478 idle ticks, 65 kernel ticks, 0 user ticks
+Console: 2020 characters output
+Keyboard: 0 keys pressed
+Powering off...
