@@ -302,7 +302,7 @@ void thread_unblock(struct thread *t)
 
 	/* Priority Schedule */
 	// list_push_back(&ready_list, &t->elem);
-	list_insert_ordered(&ready_list, &t->elem, cmp_priority, NULL);
+	list_insert_ordered(&ready_list, &t->elem, &cmp_priority, NULL);
 	t->status = THREAD_READY;
 	intr_set_level(old_level);
 }
@@ -370,7 +370,7 @@ void thread_yield(void)
 	{
 		/* Priority Schedule */
 		// list_push_back(&ready_list, &curr->elem);
-		list_insert_ordered(&ready_list, &curr->elem, cmp_priority, NULL);
+		list_insert_ordered(&ready_list, &curr->elem, &cmp_priority, NULL);
 	}
 	do_schedule(THREAD_READY);
 	intr_set_level(old_level);
@@ -535,6 +535,10 @@ init_thread(struct thread *t, const char *name, int priority)
 	t->tf.rsp = (uint64_t)t + PGSIZE - sizeof(void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
+
+	/* Priority Donation */
+	t->origin_priority = priority;
+	t->wait_on_lock = NULL;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

@@ -73,7 +73,7 @@ void sema_down(struct semaphore *sema)
 	{
 		/* Priority Scheduling-Synchronization */
 		// list_push_back (&sema->waiters, &thread_current ()->elem);
-		list_insert_ordered(&sema->waiters, &thread_current()->elem, cmp_priority, NULL);
+		list_insert_ordered(&sema->waiters, &thread_current()->elem, &cmp_priority, NULL);
 		thread_block();
 	}
 	sema->value--;
@@ -118,7 +118,7 @@ void sema_up(struct semaphore *sema)
 	old_level = intr_disable();
 	if (!list_empty(&sema->waiters))
 	{
-		list_sort(&sema->waiters, cmp_priority, NULL);
+		list_sort(&sema->waiters, &cmp_priority, NULL);
 		thread_unblock(list_entry(list_pop_front(&sema->waiters),
 								  struct thread, elem));
 	}
@@ -186,6 +186,29 @@ void lock_init(struct lock *lock)
 	sema_init(&lock->semaphore, 1);
 }
 
+// void donate_priority(void)
+// {
+// 	/*
+// 	 Nested donation을 고려하여 구현
+// 	 현재 쓰레드가 기다리고 있는 lock과 연결된 모든 쓰레드들을 순회하며 현재 쓰레드의 우선순위를 lock을 보유하고 있는 쓰레드에게 기부
+// 	 현재 쓰레드가 기다리고 있는 락의 holder -> holde가 기다리고 있는 lock의 holder
+// 	 nested depth는 8로 제한
+// 	*/
+
+// 	struct lock *curr_lock = thread_current()->wait_on_lock;
+// 	struct thread *cmp_t = list_entry(list_begin(&curr_lock->holder->donations), struct thread, d_elem);
+
+// 	while (!curr_lock)
+// 	{
+// 		if (curr_lock->holder->priority < cmp_t->priority)
+// 		{
+// 			curr_lock->holder->origin_priority = priority;
+// 			curr_lock->holder->priority = cmp_t->priority;
+// 		}
+// 		curr_lock = curr_lock->holder->wait_on_lock;
+// 	}
+// }
+
 /* Acquires LOCK, sleeping until it becomes available if
    necessary.  The lock must not already be held by the current
    thread.
@@ -200,6 +223,13 @@ void lock_acquire(struct lock *lock)
 	ASSERT(!intr_context());
 	ASSERT(!lock_held_by_current_thread(lock));
 
+	/* Priority Donation */
+	// if (lock->holder != NULL)
+	// {
+	// 	thread_current()->wait_on_lock = lock;
+	// 	list_insert_ordered(&lock->holder->donations, thread_current()->d_elem, cmp_priority, NULL);
+	// 	donate_priority();
+	// }
 	sema_down(&lock->semaphore);
 	lock->holder = thread_current();
 }
@@ -321,7 +351,7 @@ void cond_wait(struct condition *cond, struct lock *lock)
 	sema_init(&waiter.semaphore, 0);
 	/* Priority Scheduling-Synchronization */
 	// list_push_back (&cond->waiters, &waiter.elem);
-	list_insert_ordered(&cond->waiters, &waiter.elem, cmp_sem_priority, NULL);
+	list_insert_ordered(&cond->waiters, &waiter.elem, &cmp_sem_priority, NULL);
 	lock_release(lock);
 	sema_down(&waiter.semaphore);
 	lock_acquire(lock);
@@ -343,7 +373,7 @@ void cond_signal(struct condition *cond, struct lock *lock UNUSED)
 
 	if (!list_empty(&cond->waiters))
 	{
-		list_sort(&cond->waiters, cmp_sem_priority, NULL);
+		list_sort(&cond->waiters, &cmp_sem_priority, NULL);
 		sema_up(&list_entry(list_pop_front(&cond->waiters),
 							struct semaphore_elem, elem)
 					 ->semaphore);
