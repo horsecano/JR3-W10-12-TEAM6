@@ -247,10 +247,13 @@ bool cmp_priority(struct list_elem *a, struct list_elem *b, void *aux UNUSED)
 	3. 우선 순위를 비교하여 블리언 값으로 리턴한다.
 	*/
 
-	struct thread *t_a = list_entry(a, struct thread, elem);
-	struct thread *t_b = list_entry(b, struct thread, elem);
+	struct thread *t_a;
+	struct thread *t_b;
 
-	return (t_a->priority) > (t_b->priority) ? true : false;
+	t_a = list_entry(a, struct thread, elem);
+	t_b = list_entry(b, struct thread, elem);
+
+	return (t_a->priority) > (t_b->priority);
 }
 
 /* Priority Schedule */
@@ -267,14 +270,17 @@ void test_max_priority(void)
 		return;
 	}
 
-	enum intr_level oldlevel;
-	oldlevel = intr_disable();
+	// enum intr_level oldlevel;
+	// oldlevel = intr_disable();
 	// 인터럽트가 발생해서 현재 달리고 있는 쓰레드를 저장한 변수와 실제 달리고 있는 쓰레드가 다르면 안된다.
-	if (thread_current()->priority < list_begin(&ready_list))
+
+	int curr_priority = thread_current()->priority;
+	struct thread *t = list_entry(list_begin(&ready_list), struct thread, elem);
+	if (t->priority > curr_priority)
 	{
 		thread_yield();
 	}
-	intr_set_level(oldlevel);
+	// intr_set_level(oldlevel);
 }
 
 /* Transitions a blocked thread T to the ready-to-run state.
@@ -296,7 +302,7 @@ void thread_unblock(struct thread *t)
 
 	/* Priority Schedule */
 	// list_push_back(&ready_list, &t->elem);
-	list_insert_ordered(&ready_list, &t->elem, &cmp_priority, NULL);
+	list_insert_ordered(&ready_list, &t->elem, cmp_priority, NULL);
 	t->status = THREAD_READY;
 	intr_set_level(old_level);
 }
@@ -364,7 +370,7 @@ void thread_yield(void)
 	{
 		/* Priority Schedule */
 		// list_push_back(&ready_list, &curr->elem);
-		list_insert_ordered(&ready_list, &curr->elem, &cmp_priority, NULL);
+		list_insert_ordered(&ready_list, &curr->elem, cmp_priority, NULL);
 	}
 	do_schedule(THREAD_READY);
 	intr_set_level(old_level);

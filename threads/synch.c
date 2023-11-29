@@ -31,6 +31,10 @@
 #include <string.h>
 #include "threads/interrupt.h"
 #include "threads/thread.h"
+#include <debug.h>
+
+/* Priority Scheduling */
+bool cmp_sem_priority(struct list_elem *a, struct list_elem *b, void *aux UNUSED);
 
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
@@ -69,7 +73,7 @@ void sema_down(struct semaphore *sema)
 	{
 		/* Priority Scheduling-Synchronization */
 		// list_push_back (&sema->waiters, &thread_current ()->elem);
-		list_insert_ordered(&sema->waiters, &thread_current()->elem, &cmp_priority, NULL);
+		list_insert_ordered(&sema->waiters, &thread_current()->elem, cmp_priority, NULL);
 		thread_block();
 	}
 	sema->value--;
@@ -114,7 +118,7 @@ void sema_up(struct semaphore *sema)
 	old_level = intr_disable();
 	if (!list_empty(&sema->waiters))
 	{
-		list_sort(&sema->waiters, &cmp_priority, NULL);
+		list_sort(&sema->waiters, cmp_priority, NULL);
 		thread_unblock(list_entry(list_pop_front(&sema->waiters),
 								  struct thread, elem));
 	}
@@ -261,6 +265,30 @@ void cond_init(struct condition *cond)
 	list_init(&cond->waiters);
 }
 
+bool cmp_sem_priority(struct list_elem *a, struct list_elem *b, void *aux UNUSED)
+{
+	/* TODO
+	고려 사항 : 전달 받은 인자는 semaphore_elem의 elem이다.
+	목표 : 이 elem으로부터 Thread를 찾아야한다.
+
+	1. elem으로 semaphore_elem을 얻는다. -> list_entry
+	2. semaphore의 wait list의 첫번째 위차한 놈을 찾는다. -> list_bigin
+	 -> 왜냐? 우선 순위에 맞게 삽입을 해놨으니, semaphore 간의 우선 순위를 확인할 때는 각 리스트의 첫번째 놈들끼지만 비교하면 된다.
+	3. 첫번째 놈들끼리 우선 순위를 비교한다.
+	*/
+
+	struct semaphore_elem *a_sema_elem = list_entry(a, struct semaphore_elem, elem);
+	struct semaphore_elem *b_sema_elem = list_entry(b, struct semaphore_elem, elem);
+
+	struct list_elem *a_elem = list_begin(&(a_sema_elem->semaphore.waiters));
+	struct list_elem *b_elem = list_begin(&(a_sema_elem->semaphore.waiters));
+
+	struct thread *a_t = list_entry(a_elem, struct thread, elem);
+	struct thread *b_t = list_entry(b_elem, struct thread, elem);
+
+	return (a_t->priority) > (b_t->priority);
+}
+
 /* Atomically releases LOCK and waits for COND to be signaled by
    some other piece of code.  After COND is signaled, LOCK is
    reacquired before returning.  LOCK must be held before calling
@@ -293,34 +321,10 @@ void cond_wait(struct condition *cond, struct lock *lock)
 	sema_init(&waiter.semaphore, 0);
 	/* Priority Scheduling-Synchronization */
 	// list_push_back (&cond->waiters, &waiter.elem);
-	list_insert_ordered(&cond->waiters, &waiter.elem, &cmp_sem_priority, NULL);
+	list_insert_ordered(&cond->waiters, &waiter.elem, cmp_sem_priority, NULL);
 	lock_release(lock);
 	sema_down(&waiter.semaphore);
 	lock_acquire(lock);
-}
-
-bool cmp_sem_priority(struct list_elem *a, struct list_elem *b, void *aux UNUSED)
-{
-	/* TODO
-	고려 사항 : 전달 받은 인자는 semaphore_elem의 elem이다.
-	목표 : 이 elem으로부터 Thread를 찾아야한다.
-
-	1. elem으로 semaphore_elem을 얻는다. -> list_entry
-	2. semaphore의 wait list의 첫번째 위차한 놈을 찾는다. -> list_bigin
-	 -> 왜냐? 우선 순위에 맞게 삽입을 해놨으니, semaphore 간의 우선 순위를 확인할 때는 각 리스트의 첫번째 놈들끼지만 비교하면 된다.
-	3. 첫번째 놈들끼리 우선 순위를 비교한다.
-	*/
-
-	struct semaphore_elem *a_sema_elem = list_entry(a, struct semaphore_elem, elem);
-	struct semaphore_elem *b_sema_elem = list_entry(b, struct semaphore_elem, elem);
-
-	struct list_elem *a_elem = list_begin(&(a_sema_elem->semaphore.waiters));
-	struct list_elem *b_elem = list_begin(&(a_sema_elem->semaphore.waiters));
-
-	struct thread *a_t = list_entry(a_elem, struct thread, elem);
-	struct thread *b_t = list_entry(b_elem, struct thread, elem);
-
-	return (a_t->priority) > (b_t->priority);
 }
 
 /* If any threads are waiting on COND (protected by LOCK), then
@@ -339,7 +343,7 @@ void cond_signal(struct condition *cond, struct lock *lock UNUSED)
 
 	if (!list_empty(&cond->waiters))
 	{
-		list_sort(&cond->waiters, &cmp_sem_priority, NULL);
+		list_sort(&cond->waiters, cmp_sem_priority, NULL);
 		sema_up(&list_entry(list_pop_front(&cond->waiters),
 							struct semaphore_elem, elem)
 					 ->semaphore);
