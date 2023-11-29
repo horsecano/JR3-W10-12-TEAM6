@@ -430,15 +430,14 @@ void thread_wakeup(int64_t global_tick)
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void thread_set_priority(int new_priority)
 {
-	// thread_current()->origin_priority = new_priority;
-	thread_current()->priority = new_priority;
+	thread_current()->origin_priority = new_priority;
 
 	/* Priority Schedule
 	Check wheter priority of newly updated thread is greater than current running thread
 	 */
 	// printf("thread_set_priority (1)  \n");
 
-	// refresh_priority();
+	refresh_priority();
 	// printf("thread_set_priority (2)  \n");
 
 	test_max_priority();

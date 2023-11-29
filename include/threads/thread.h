@@ -99,6 +99,12 @@ struct thread
 	/* Store local tick */
 	int64_t wakeup_tick;
 
+	/* Priority Donation */
+	int origin_priority;
+	struct lock *wait_on_lock;
+	struct list donations;
+	struct list_elem d_elem;
+
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4; /* Page map level 4 */
@@ -153,5 +159,11 @@ void thread_wakeup(int64_t global_tick);
 /* Priority Scheduling */
 bool cmp_priority(struct list_elem *a, struct list_elem *b, void *aux UNUSED);
 void test_max_priority(void);
+
+
+/* Priority Donation */
+void donate_priority(void);
+void remove_with_lock(struct lock *lock);
+void refresh_priority(void);
 
 #endif /* threads/thread.h */
