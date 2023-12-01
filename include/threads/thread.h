@@ -105,6 +105,10 @@ struct thread
 	struct list donations;
 	struct list_elem d_elem;
 
+	/* Advanced Prority */
+	int nice;
+	int recent_cpu;
+
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4; /* Page map level 4 */
@@ -160,12 +164,16 @@ void thread_wakeup(int64_t global_tick);
 bool cmp_priority(struct list_elem *a, struct list_elem *b, void *aux UNUSED);
 void test_max_priority(void);
 
-
 /* Priority Donation */
 void donate_priority(void);
 void remove_with_lock(struct lock *lock);
 void refresh_priority(void);
 
-
+/* Advanced Scheduler */
+void mlfqs_prioirty(struct thread *t);
+void mlfqs_recent_cpu(struct thread *t);
+void mlfqs_load_avg(void);
+void mlfqs_increment(void);
+void mlfqs_recalc(void);
 
 #endif /* threads/thread.h */

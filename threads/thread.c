@@ -72,6 +72,12 @@ static tid_t allocate_tid(void);
 bool cmp_priority(struct list_elem *a, struct list_elem *b, void *aux UNUSED);
 void test_max_priority(void);
 
+/* Advanced Scheduler */
+#define NICE_DEFUALT 0
+#define RECENT_CPU_DEFAULT 0
+#define LOAD_AVG_DEFAULT 0
+
+
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
 
@@ -546,6 +552,10 @@ init_thread(struct thread *t, const char *name, int priority)
 	t->origin_priority = priority;
 	t->wait_on_lock = NULL;
 	list_init(&t->donations);
+
+	/* Advanced Scheduler */
+	t -> nice = NICE_DEFUALT;
+	t -> recent_cpu = RECENT_CPU_DEFAULT;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
