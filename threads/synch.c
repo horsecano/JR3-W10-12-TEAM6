@@ -35,7 +35,7 @@
 
 /* Priority Scheduling */
 bool cmp_sem_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
-// bool d_elem_cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+bool d_elem_cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
