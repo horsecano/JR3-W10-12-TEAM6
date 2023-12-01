@@ -11,6 +11,7 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "intrinsic.h"
+#include "threads/fixed_point.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -73,10 +74,12 @@ bool cmp_priority(struct list_elem *a, struct list_elem *b, void *aux UNUSED);
 void test_max_priority(void);
 
 /* Advanced Scheduler */
+
 #define NICE_DEFUALT 0
 #define RECENT_CPU_DEFAULT 0
 #define LOAD_AVG_DEFAULT 0
 
+int load_avg;
 
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
@@ -92,6 +95,96 @@ void test_max_priority(void);
 // Because the gdt will be setup after the thread_init, we should
 // setup temporal gdt first.
 static uint64_t gdt[3] = {0, 0x00af9a000000ffff, 0x00cf92000000ffff};
+
+/* Advanced Scheduler
+Calculate priority with recent_cpu and niceness
+*/
+void mlfqs_prioirty(struct thread *t)
+{
+	// It is consider that recent_cpu, load_avg is real number
+	if (t != idle_thread)
+	{
+		printf("thread priority before : %d \n", t->priority);
+		t->priority = PRI_MAX - (t->recent_cpu / 4) - (t->nice * 2);
+		printf("thread priority after : %d \n", t->priority);
+	}
+}
+
+void mlfqs_recent_cpu(struct thread *t)
+{
+	// It is consider that recent_cpu, load_avg is real number
+	if (t != idle_thread)
+	{
+		printf("recent_cpu before : %d \n", t->recent_cpu);
+		t->recent_cpu = (2 * load_avg) / (2 * load_avg + 1) * t->recent_cpu + t->nice;
+		printf("recent_cpu after : %d \n", t->recent_cpu);
+	}
+}
+void mlfqs_load_avg(void)
+{
+	/*
+	1. It is consider that recent_cpu, load_avg is real number
+	2. 언제 Interupt OFF를 해야할까?
+	3. load_avg souldn't be less than 0.
+	*/
+	int ready_threads = list_size(&ready_list);
+	if (thread_current() != idle_thread)
+	{
+		ready_threads = ready_threads + 1;
+	}
+
+	load_avg = (59 / 60) * load_avg + (1 / 60) * ready_threads;
+
+	if (load_avg < 0)
+	{
+		load_avg = 0;
+	}
+}
+
+void mlfqs_increment(void)
+{
+	struct thread *curr = thread_current();
+	if (curr != idle_thread)
+	{
+		curr->recent_cpu = curr->recent_cpu + 1;
+	}
+}
+void mlfqs_recalc(void)
+{
+	/*
+	1. 모든 쓰레드들을 찾는다.
+		- 실행 중인 쓰레드
+		- 대기 중인 쓰레드
+		- BlOCK 중인 쓰레드
+	2. 쓰레드를의 모든 우선 순위와 recent_cpu를 다시 계산한다.
+	*/
+	struct thread *curr = thread_current();
+	if (curr != idle_thread)
+	{
+		mlfqs_prioirty(curr);
+		mlfqs_recent_cpu(curr);
+	}
+
+	struct list_elem *e = list_begin(&ready_list);
+	while (e != list_end(&ready_list))
+	{
+		struct thread *curr_t = list_entry(e, struct thread, elem);
+		mlfqs_prioirty(curr_t);
+		mlfqs_recent_cpu(curr_t);
+
+		e = list_next(e);
+	}
+	
+	e = list_begin(&sleep_list);
+	while (e != list_end(&sleep_list))
+	{
+		struct thread *curr_t = list_entry(e, struct thread, elem);
+		mlfqs_prioirty(curr_t);
+		mlfqs_recent_cpu(curr_t);
+
+		e = list_next(e);
+	}
+}
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -145,6 +238,9 @@ void thread_start(void)
 
 	/* Wait for the idle thread to initialize idle_thread. */
 	sema_down(&idle_started);
+
+	/* Advanced Scheduler */
+	load_avg = LOAD_AVG_DEFAULT;
 }
 
 /* Called by the timer interrupt handler at each timer tick.
@@ -554,8 +650,8 @@ init_thread(struct thread *t, const char *name, int priority)
 	list_init(&t->donations);
 
 	/* Advanced Scheduler */
-	t -> nice = NICE_DEFUALT;
-	t -> recent_cpu = RECENT_CPU_DEFAULT;
+	t->nice = NICE_DEFUALT;
+	t->recent_cpu = RECENT_CPU_DEFAULT;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

@@ -10,7 +10,7 @@ int fp_to_int_round(int x);
 int fp_to_int(int x);
 int add_fp(int x, int y);
 int add_mixed(int x, int n);
-int sub_fup(int x, int y);
+int sub_fp(int x, int y);
 int sub_mixed(int x, int y);
 int mult_fp(int x, int y);
 int mult_mixed(int x, int y);
@@ -57,7 +57,7 @@ int add_mixed(int x, int n)
 }
 
 /* Subtract between FP */
-int sub_fup(int x, int y)
+int sub_fp(int x, int y)
 {
     return x - y;
 }
@@ -92,27 +92,27 @@ int div_mixed(int x, int n)
     return x / n;
 }
 
-// void printbits(int x)
-// {
-//     for (int i = 31; i >= 0; i--)
-//     {
-//         int bit = (x >> i) & 1;
-//         printf("%d", bit);
+void printbits(int x)
+{
+    for (int i = 31; i >= 0; i--)
+    {
+        int bit = (x >> i) & 1;
+        printf("%d", bit);
 
-//         if (i == 31 || i == 14)
-//         {
-//             printf(" | ");
-//         }
-//     }
-//     printf("\n");
-// }
+        if (i == 31 || i == 14)
+        {
+            printf(" | ");
+        }
+    }
+    printf("\n");
+}
 
 // int main()
 // {
-//     int n = 1244;
-//     printf("Here's n Value : %d\n", n);
+//     long n = div_fp(51, 60);
+//     printf("Here's n Value : %ld\n", n);
 //     printf("Here's n to FP Bit represention : ");
-//     printbits(int_to_fp(n));
+//     printbits(n);
 //     printf("Here's n to int bit represention : ");
 //     printbits(fp_to_int_round(int_to_fp(n)));
 
