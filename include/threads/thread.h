@@ -166,6 +166,9 @@ void test_max_priority(void);
 
 /* Priority Donation */
 void donate_priority(void);
+
+/// @brief 
+/// @param lock 
 void remove_with_lock(struct lock *lock);
 void refresh_priority(void);
 

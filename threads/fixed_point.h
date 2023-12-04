@@ -1,6 +1,3 @@
-#include <stdio.h>
-#include <stdint.h>
-
 #define F (1 << 14)
 #define INT_MAX ((1 << 31) - 1)
 #define INT_MIN (-(1 << 31))
@@ -20,8 +17,6 @@ int div_mixed(int x, int n);
 /* integer to fixed point */
 int int_to_fp(int n)
 {
-    // 고려사항!
-    // n을 어디까지 제한해야할까?
     return n * F;
 }
 
@@ -36,11 +31,11 @@ int fp_to_int_round(int x)
 {
     if (x >= 0)
     {
-        return ((x + F / 2) / F);
+        return (x + F / 2) / F;
     }
     else
     {
-        return ((x - F / 2) / F);
+        return (x - F / 2) / F;
     }
 }
 
@@ -53,7 +48,7 @@ int add_fp(int x, int y)
 /* Add between FP and int */
 int add_mixed(int x, int n)
 {
-    return x + (n * F);
+    return x + n * F;
 }
 
 /* Subtract between FP */
@@ -65,13 +60,13 @@ int sub_fp(int x, int y)
 /* Subtract between FP and int */
 int sub_mixed(int x, int n)
 {
-    return x - (n * F);
+    return x - n * F;
 }
 
 /* Multiple between FP */
 int mult_fp(int x, int y)
 {
-    return (int)(((int64_t)x) * y / F);
+    return ((int64_t)x) * y / F;
 }
 
 /* Multiple between FP and int */
@@ -83,7 +78,7 @@ int mult_mixed(int x, int n)
 /* Divide between FP */
 int div_fp(int x, int y)
 {
-    return (int)(((int64_t)x) * F / y);
+    return ((int64_t)x) * F / y;
 }
 
 /* Divide between FP and int */
@@ -92,24 +87,25 @@ int div_mixed(int x, int n)
     return x / n;
 }
 
-void printbits(int x)
-{
-    for (int i = 31; i >= 0; i--)
-    {
-        int bit = (x >> i) & 1;
-        printf("%d", bit);
+// void printbits(int x)
+// {
+//     for (int i = 31; i >= 0; i--)
+//     {
+//         int bit = (x >> i) & 1;
+//         printf("%d", bit);
 
-        if (i == 31 || i == 14)
-        {
-            printf(" | ");
-        }
-    }
-    printf("\n");
-}
+//         if (i == 31 || i == 14)
+//         {
+//             printf(" | ");
+//         }
+//     }
+//     printf("\n");
+// }
 
 // int main()
 // {
 //     long n = div_fp(51, 60);
+
 //     printf("Here's n Value : %ld\n", n);
 //     printf("Here's n to FP Bit represention : ");
 //     printbits(n);
