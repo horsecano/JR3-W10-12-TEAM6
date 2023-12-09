@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/interrupt.h"
+#include "threads/synch.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -16,6 +17,12 @@ enum thread_status
 	THREAD_READY,	/* Not running but ready to run. */
 	THREAD_BLOCKED, /* Waiting for an event to trigger. */
 	THREAD_DYING	/* About to be destroyed. */
+};
+
+enum proccess_status
+{
+	PROCESS_RUNNING,
+	PROCESS_END
 };
 
 /* Thread identifier type.
@@ -109,6 +116,29 @@ struct thread
 	int nice;
 	int recent_cpu;
 
+	/* User program */
+	/*
+	TODO
+	1. 자식 프로세스가 성공적으로 생성되었는지를 나타내는 플래그 추가 (실행 파일 로드에 실패하면-1)
+	2. 프로세스의 종료 유무 필드 추가
+	3. 정상적으로 종료가 되었는지를 status 확인하는 필드 추가
+	4. 프로세스의 대기를 위한 세마포어에 대한 필드 추가
+	5. 자식 프로세스 리스트의 대한 필드 추가
+	6. 부모 프로세스 디스크립터 포인터 필드 추가
+	*/
+	struct semaphore sema_wait;	 // process_wait을 위한 세마포어
+	struct semaphore sema_exit;	 // process_exit을 위한 세마포어
+	struct thread *parent;		 // 부모 쓰레드 포인터
+	struct list child_list;		 // 자식 프로세스 리스트의 대한 필드
+	struct list_elem child_elem; // 자식 프로세스 리스트에 대한 원소
+	int return_status;			 // 정상적으로 종료가 되었는지를 status 확인하는 필드 추가
+	bool exited;				 // 프로세스의 종료 유무
+	bool waited;				 // 부모 쓰레드가 wait 중인지의 여부
+
+	/* File Discriptor */
+	struct file *fdt[64];
+	int next_fd;
+
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4; /* Page map level 4 */
@@ -167,8 +197,8 @@ void test_max_priority(void);
 /* Priority Donation */
 void donate_priority(void);
 
-/// @brief 
-/// @param lock 
+/// @brief
+/// @param lock
 void remove_with_lock(struct lock *lock);
 void refresh_priority(void);
 

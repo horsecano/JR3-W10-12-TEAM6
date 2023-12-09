@@ -18,6 +18,9 @@
 #include "threads/mmu.h"
 #include "threads/vaddr.h"
 #include "intrinsic.h"
+#include "threads/synch.h"
+#include "user/syscall.h"
+
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -27,6 +30,91 @@ static bool load(const char *file_name, struct intr_frame *if_);
 static void initd(void *f_name);
 static void __do_fork(void *);
 static bool arguement_stack(void **rsp, char **argv, int argc);
+
+/* User Program */
+struct thread *get_child_process(pid_t pid);
+int remove_child_process(pid_t pid);
+
+/* File Descipoter */
+int process_add_file(struct file *f);
+struct file *process_get_file(int fd);
+void process_close_file(int fd);
+
+/* 파일 객체에 대한 파일 디스크립터 생성 */
+int process_add_file(struct file *f)
+{
+	struct thread *curr = thread_current();
+	struct file **curr_fdt = curr->fdt;
+	int fd = curr->next_fd;
+	curr_fdt[fd] = f;
+	curr->next_fd += 1;
+	return fd;
+}
+
+/* 파일 객체를 검색하는 함수 */
+struct file *process_get_file(int fd)
+{
+	struct file **curr_fdt = thread_current()->fdt;
+
+	if (curr_fdt[fd] != NULL)
+	{
+		return curr_fdt[fd];
+	}
+	return NULL;
+}
+
+void process_close_file(int fd)
+{
+	struct thread *curr = thread_current();
+	if (fd < 0 || fd > curr->next_fd)
+	{
+		return;
+	}
+
+	struct file **curr_fdt = curr->fdt;
+	struct file *curr_file = process_get_file(fd);
+
+	if (curr_file == NULL)
+	{
+		return;
+	}
+	file_close(curr_file);
+	curr_fdt[fd] = NULL;
+	curr->next_fd -= 1;
+}
+
+/* Searching for child thread in the child_list and return that process discriptor */
+struct thread *get_child_process(pid_t pid)
+{
+	struct thread *curr = thread_current();
+	struct list_elem *begin = list_begin(&curr->child_list);
+	for (struct list_elem *e = begin; e != list_end(&curr->child_list); e = list_next(e))
+	{
+		struct thread *curr_thread = list_entry(e, struct thread, child_elem);
+		if (curr_thread->tid == pid)
+		{
+			return curr_thread;
+		}
+	}
+	return NULL;
+}
+
+/* Remove the child_processs discriptor and free from memory */
+int remove_child_process(pid_t pid)
+{
+	struct thread *curr = thread_current();
+	struct list_elem *begin = list_begin(&curr->child_list);
+	for (struct list_elem *e = begin; e != list_end(&curr->child_list); list_next(e))
+	{
+		struct thread *curr_thread = list_entry(e, struct thread, child_elem);
+		if (curr_thread->tid == pid)
+		{
+			list_remove(&curr_thread->child_elem);
+			// 자식 프로세스 디스크립터 메모리 해제해야함
+		}
+	}
+	return 0;
+}
 
 /* General process initializer for initd and other process. */
 static void process_init(void)
@@ -51,8 +139,11 @@ tid_t process_create_initd(const char *file_name)
 		return TID_ERROR;
 	strlcpy(fn_copy, file_name, PGSIZE);
 
+	char *save_ptr, *parsed_file_name;
+	parsed_file_name = strtok_r(file_name, " ", &save_ptr);
+
 	/* Create a new thread to execute FILE_NAME. */
-	tid = thread_create(file_name, PRI_DEFAULT, initd, fn_copy);
+	tid = thread_create(parsed_file_name, PRI_DEFAULT, initd, fn_copy);
 	if (tid == TID_ERROR)
 		palloc_free_page(fn_copy);
 	return tid;
@@ -167,27 +258,6 @@ error:
  * Returns -1 on fail. */
 int process_exec(void *f_name)
 {
-
-	/* TODO
-	- 개선 사항
-	1. 현재 f_name은 프로그램 이름과 인자들이 구분이 안되어있는 상태이다.
-
-	- 해결방법
-	1. argc를 선언해서 카운트를 추적해야한다.
-	2. argv를 포인터 배열을 선언해서 인자들을 담아야한다.
-	3. strtok_r() 사용을 위해서 token이라는 포인터, save_ptr 포인터를 선언한다.
-	4. ' '를 기준으로 for문을 돌면서 argv 배열에 담는다.
-	5. argv[0] 번째애는 프로그램 이름이 담겨있다. 이를 file_name과 대체한다.
-
-	- 개선 사항
-	2. 전달받은 인자들을 유저 스택에 저장해야한다.
-
-	- 해결방법
-	1. argument_stack() 함수를 생성한다.
-	2. 함수의 인자로서 intr_frame (_if)구조체, argc, argv를 전달한다.
-	3. _if에서 Userstack을 가리키고 있는 레지스터를 (rsp) 가져와야한다.
-	*/
-
 	char *file_name = f_name;
 	bool success;
 
@@ -207,10 +277,10 @@ int process_exec(void *f_name)
 		return -1;
 	}
 
-	for (int i = 0; argv[i] != NULL; i++)
-	{
-		printf("argv[%d] : %s \n", i, argv[i]);
-	}
+	// for (int i = 0; argv[i] != NULL; i++)
+	// {
+	// 	printf("argv[%d] : %s \n", i, argv[i]);
+	// }
 
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
@@ -237,11 +307,14 @@ int process_exec(void *f_name)
 	// // %rsi register shoud be pointing to argv[0] which is lowest virtual address
 	_if.R.rsi = (uint64_t)_if.rsp + sizeof(void *);
 
-	hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
+	// hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
 	/* If load failed, quit. */
-	palloc_free_page(argv[0]);
+	palloc_free_page(file_name);
 	if (!success)
 		return -1;
+
+	/* if memory load is success, wake up its parent thread */
+	// sema_up(&thread_current()->parent->sema_wait);
 
 	/* Start switched process. */
 	do_iret(&_if);
@@ -261,7 +334,7 @@ static bool arguement_stack(void **rsp, char **argv, int argc)
 
 	// 정렬을 맞추고 argv[argc]를 NULL로 지정한다.
 	int padding = ((int)*rsp % 8);
-	printf("padding : %d \n", padding);
+	// printf("padding : %d \n", padding);
 	for (int i = 0; i < padding; i++)
 	{
 		(*rsp)--;
@@ -313,12 +386,13 @@ static bool arguement_stack(void **rsp, char **argv, int argc)
  * does nothing. */
 int process_wait(tid_t child_tid UNUSED)
 {
-	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
-	 * XXX:       to add infinite loop here before
-	 * XXX:       implementing the process_wait. */
-	while (true)
+	// struct thread *child_pc;
+	// while ((child_pc = get_child_process(child_tid)) != NULL)
+	// {
+	// 	sema_down(&child_pc->sema_wait);
+	// }
+	for (int i = 0; i < 1000000000; i++)
 	{
-		continue;
 	}
 
 	return -1;
@@ -328,12 +402,30 @@ int process_wait(tid_t child_tid UNUSED)
 void process_exit(void)
 {
 	struct thread *curr = thread_current();
+
 	/* TODO: Your code goes here.
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
 
+	// for (int i = 0; i < curr->next_fd; i++)
+	// {
+	// 	struct file *curr_file = process_get_file(i);
+	// 	if (curr_file != NULL)
+	// 	{
+	// 		file_close(curr_file);
+	// 	}
+	// }
+
+	// if (curr->fdt != NULL)
+	// {
+	// 	palloc_free_page(curr->fdt);
+	// }
+
 	process_cleanup();
+	// sema_up(&curr->sema_wait);
+
+	return;
 }
 
 /* Free the current process's resources. */

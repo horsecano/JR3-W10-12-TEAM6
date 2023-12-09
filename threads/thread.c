@@ -74,11 +74,9 @@ bool cmp_priority(struct list_elem *a, struct list_elem *b, void *aux UNUSED);
 void test_max_priority(void);
 
 /* Advanced Scheduler */
-
 #define NICE_DEFUALT 0
 #define RECENT_CPU_DEFAULT 0
 #define LOAD_AVG_DEFAULT 0
-
 int load_avg;
 
 /* Returns true if T appears to point to a valid thread. */
@@ -312,7 +310,7 @@ tid_t thread_create(const char *name, int priority,
 {
 	struct thread *t;
 	tid_t tid;
-
+	struct thread *curr = thread_current();
 	ASSERT(function != NULL);
 
 	/* Allocate thread. */
@@ -334,6 +332,25 @@ tid_t thread_create(const char *name, int priority,
 	t->tf.ss = SEL_KDSEG;
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
+
+	/* User Program */
+	t->parent = curr;
+	list_push_front(&curr->child_list, &t->child_elem);
+	sema_init(&t->sema_wait, 0);
+	sema_init(&t->sema_exit, 0);
+	t->return_status = 0;
+	t->exited = false;
+	t->waited = false;
+
+	/* File Discriptor */
+	// t->fdt = palloc_get_page(PAL_ZERO);
+	memset(t->fdt, 0, sizeof(struct file *) * 64);
+
+	t->next_fd = 0;
+	t->fdt[t->next_fd] = 0;
+	t->next_fd += 1;
+	t->fdt[t->next_fd] = 1;
+	t->next_fd += 1;
 
 	/* Add to run queue. */
 	thread_unblock(t);
@@ -686,6 +703,9 @@ init_thread(struct thread *t, const char *name, int priority)
 	/* Advanced Scheduler */
 	t->nice = NICE_DEFUALT;
 	t->recent_cpu = RECENT_CPU_DEFAULT;
+
+	/* User Program */
+	list_init(&t->child_list);
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
