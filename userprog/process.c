@@ -99,7 +99,10 @@ struct thread *get_child_process(pid_t pid)
 	return NULL;
 }
 
-/* Remove the child_processs discriptor and free from memory */
+/* Remove the child_processs discriptor and free from memory
+if 성공, 0
+else -1
+*/
 int remove_child_process(pid_t pid)
 {
 	struct thread *curr = thread_current();
@@ -110,10 +113,12 @@ int remove_child_process(pid_t pid)
 		if (curr_thread->tid == pid)
 		{
 			list_remove(&curr_thread->child_elem);
-			// 자식 프로세스 디스크립터 메모리 해제해야함
+			palloc_free_page(curr_thread->fdt);
+			palloc_free_page(curr_thread);
+			return 0;
 		}
 	}
-	return 0;
+	return -1;
 }
 
 /* General process initializer for initd and other process. */
@@ -260,7 +265,6 @@ int process_exec(void *f_name)
 {
 	char *file_name = f_name;
 	bool success;
-
 	int argc = 0;
 	char *argv[64];
 	char *token, *save_ptr;
@@ -301,10 +305,7 @@ int process_exec(void *f_name)
 	Set up the arguement into userstack
 	*/
 	arguement_stack(&_if.rsp, &argv, argc);
-
-	// // %rdi register shoud be pointing to argc the total num of arguement
 	_if.R.rdi = argc;
-	// // %rsi register shoud be pointing to argv[0] which is lowest virtual address
 	_if.R.rsi = (uint64_t)_if.rsp + sizeof(void *);
 
 	// hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
@@ -312,9 +313,6 @@ int process_exec(void *f_name)
 	palloc_free_page(file_name);
 	if (!success)
 		return -1;
-
-	/* if memory load is success, wake up its parent thread */
-	// sema_up(&thread_current()->parent->sema_wait);
 
 	/* Start switched process. */
 	do_iret(&_if);

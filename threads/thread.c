@@ -334,10 +334,12 @@ tid_t thread_create(const char *name, int priority,
 	t->tf.eflags = FLAG_IF;
 
 	/* User Program */
-	t->parent = curr;
-	list_push_front(&curr->child_list, &t->child_elem);
+	
+	
 	sema_init(&t->sema_wait, 0);
 	sema_init(&t->sema_exit, 0);
+	t->parent = curr;
+	list_push_front(&curr->child_list, &t->child_elem);
 	t->return_status = 0;
 	t->exited = false;
 	t->waited = false;

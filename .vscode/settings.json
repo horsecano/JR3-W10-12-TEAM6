@@ -91,7 +91,8 @@
     "string_view": "c",
     "initializer_list": "c",
     "utility": "c",
-    "input.h": "c"
+    "input.h": "c",
+    "palloc.h": "c"
   },
   "C_Cpp.errorSquiggles": "disabled"
 }

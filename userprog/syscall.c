@@ -13,6 +13,7 @@
 #include "user/syscall.h"
 #include "filesys/file.h"
 #include "devices/input.h"
+#include "threads/palloc.h"
 
 void syscall_entry(void);
 void syscall_handler(struct intr_frame *);
@@ -331,24 +332,17 @@ int wait(pid_t pid)
 
 int exec(const char *file)
 {
-	pid_t pid;
-	struct thread *curr = thread_current();
-
-	if (!file || !check_address(file))
+	check_address(file);
+	char *fn_copy;
+	fn_copy = palloc_get_page(PAL_ZERO);
+	if (fn_copy == NULL)
+		return TID_ERROR;
+	strlcpy(fn_copy, file, PGSIZE);
+	if (process_exec(fn_copy) == -1)
 	{
-		printf("cmd_line is not vaild \n");
 		return -1;
 	}
-
-	pid = process_create_initd(file);
-	sema_down(&curr->sema_wait);
-
-	if (pid == -1)
-	{
-		printf("process_create_initd is failed \n");
-		exit(-1);
-	}
-	return pid;
+	return 0;
 }
 
 pid_t fork(const char *thread_name)
