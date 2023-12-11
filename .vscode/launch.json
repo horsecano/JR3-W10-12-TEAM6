@@ -2,6 +2,31 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "(gdb) Attach",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceRoot}/${input:project}/build/kernel.o",
+      "MIMode": "gdb",
+      "stopAtEntry": true,
+      "cwd": "${workspaceFolder}",
+      "targetArchitecture": "x86_64",
+      "externalConsole": true,
+      "miDebuggerServerAddress": "localhost:1234",
+      "setupCommands": [
+        {
+          "description": "Enable pretty-printing for gdb",
+          "text": "-enable-pretty-printing",
+          "ignoreFailures": true
+        },
+        {
+          "description": "Set Disassembly Flavor to Intel",
+          "text": "-gdb-set disassembly-flavor intel",
+          "ignoreFailures": true
+        }
+      ],
+      "preLaunchTask": "dbg_pintos"
+    },
+    {
       "name": "C/C++ Runner: Debug Session",
       "type": "cppdbg",
       "request": "launch",
@@ -18,6 +43,19 @@
           "text": "-enable-pretty-printing",
           "ignoreFailures": true
         }
+      ]
+    }
+  ],
+  "inputs": [
+    {
+      "id": "project",
+      "description": "Enter the project to start.",
+      "type": "pickString",
+      "options": [
+        "threads",
+        "userprog",
+        "filesys",
+        "vm"
       ]
     }
   ]

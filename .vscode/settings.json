@@ -92,7 +92,9 @@
     "initializer_list": "c",
     "utility": "c",
     "input.h": "c",
-    "palloc.h": "c"
+    "palloc.h": "c",
+    "stdbool.h": "c",
+    "stddef.h": "c"
   },
   "C_Cpp.errorSquiggles": "disabled"
 }

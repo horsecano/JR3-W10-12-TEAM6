@@ -126,14 +126,17 @@ struct thread
 	5. 자식 프로세스 리스트의 대한 필드 추가
 	6. 부모 프로세스 디스크립터 포인터 필드 추가
 	*/
-	struct semaphore sema_wait;	 // process_wait을 위한 세마포어
-	struct semaphore sema_exit;	 // process_exit을 위한 세마포어
+	struct semaphore sema_wait; // process_wait을 위한 세마포어
+	struct semaphore sema_exit; // process_exit을 위한 세마포어
+	struct semaphore sema_fork; // process_exit을 위한 세마포어
+
 	struct thread *parent;		 // 부모 쓰레드 포인터
 	struct list child_list;		 // 자식 프로세스 리스트의 대한 필드
 	struct list_elem child_elem; // 자식 프로세스 리스트에 대한 원소
-	int return_status;			 // 정상적으로 종료가 되었는지를 status 확인하는 필드 추가
-	bool exited;				 // 프로세스의 종료 유무
-	bool waited;				 // 부모 쓰레드가 wait 중인지의 여부
+	int return_status;
+	struct intr_frame parent_if;
+	bool exited; // 프로세스의 종료 유무
+	bool waited; // 부모 쓰레드가 wait 중인지의 여부
 
 	/* File Discriptor */
 	struct file *fdt[64];

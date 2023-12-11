@@ -22,7 +22,7 @@ int check_address(void *addr);
 
 void halt(void) NO_RETURN;
 void exit(int status) NO_RETURN;
-pid_t fork(const char *thread_name);
+int sys_fork(const char *thread_name, struct intr_frame *f);
 int exec(const char *file);
 int wait(pid_t);
 bool create(const char *file, unsigned initial_size);
@@ -61,7 +61,7 @@ void syscall_init(void)
 			  FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
 
 	/* File Discriptor */
-	// lock_init(&filesys_lock);
+	lock_init(&filesys_lock);
 }
 
 /* The main system call interface */
@@ -78,6 +78,7 @@ void syscall_handler(struct intr_frame *f UNUSED)
 		break;
 
 	case SYS_FORK:
+		f->R.rax = sys_fork(f->R.rdi, f);
 		break;
 
 	case SYS_EXEC:
@@ -217,8 +218,11 @@ int read(int fd, void *buffer, unsigned length)
 	}
 	else
 	{
+		lock_acquire(&filesys_lock);
 		read_bite = file_read(curr_file, buffer, length);
+		lock_release(&filesys_lock);
 	}
+
 	return read_bite;
 }
 
@@ -243,9 +247,12 @@ int write(int fd, const void *buffer, unsigned length)
 	}
 	else
 	{
+		lock_acquire(&filesys_lock);
 		struct file *f = curr->fdt[fd];
 		write_byte = file_write(f, buffer, length);
+		lock_release(&filesys_lock);
 	}
+
 	return write_byte;
 }
 
@@ -314,20 +321,7 @@ void close(int fd)
 
 int wait(pid_t pid)
 {
-
-	if (!pid || !check_address(pid))
-	{
-		printf("wait function of pid is not vaild \n");
-		return -1;
-	}
-
-	if (process_wait(pid) == -1)
-	{
-		printf("process_wait is failed \n");
-		return -1;
-	}
-
-	return 0;
+	return process_wait(pid);
 }
 
 int exec(const char *file)
@@ -345,7 +339,7 @@ int exec(const char *file)
 	return 0;
 }
 
-pid_t fork(const char *thread_name)
+int sys_fork(const char *thread_name, struct intr_frame *f)
 {
-	return;
+	return process_fork(thread_name, f);
 }

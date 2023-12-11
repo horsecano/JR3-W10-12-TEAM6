@@ -334,10 +334,11 @@ tid_t thread_create(const char *name, int priority,
 	t->tf.eflags = FLAG_IF;
 
 	/* User Program */
-	
-	
-	sema_init(&t->sema_wait, 0);
-	sema_init(&t->sema_exit, 0);
+
+	// sema_init(&t->sema_wait, 0);
+	// sema_init(&t->sema_exit, 0);
+	// sema_init(&t->sema_fork, 0);
+
 	t->parent = curr;
 	list_push_front(&curr->child_list, &t->child_elem);
 	t->return_status = 0;
@@ -708,6 +709,11 @@ init_thread(struct thread *t, const char *name, int priority)
 
 	/* User Program */
 	list_init(&t->child_list);
+
+	/* User Program */
+	sema_init(&t->sema_wait, 0);
+	sema_init(&t->sema_exit, 0);
+	sema_init(&t->sema_fork, 0);
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
