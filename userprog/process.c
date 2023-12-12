@@ -46,18 +46,27 @@ int process_add_file(struct file *f)
 	struct thread *curr = thread_current();
 	struct file **curr_fdt = curr->fdt;
 	int fd = curr->next_fd;
-	curr_fdt[fd] = f;
-	curr->next_fd += 1;
-	return fd;
+	if (fd < 63)
+	{
+		curr_fdt[fd] = f;
+		curr->next_fd += 1;
+		return fd;
+	}
+	return -1;
 }
 
 /* 파일 객체를 검색하는 함수 */
 struct file *process_get_file(int fd)
 {
 	struct file **curr_fdt = thread_current()->fdt;
+	// printf("curr_fdt : %d \n", curr_fdt);
+	// printf("curr_fdt[0] : %d \n", curr_fdt[0]);
+	// printf("curr_fdt[1] : %d \n", curr_fdt[1]);
+	// printf("curr_fdt[2] : %d \n", curr_fdt[2]);
 
 	if (curr_fdt[fd] != NULL)
 	{
+		// printf("curr_fdt[%d] : %d \n", fd, curr_fdt[fd]);
 		return curr_fdt[fd];
 	}
 	return NULL;
@@ -65,20 +74,14 @@ struct file *process_get_file(int fd)
 
 void process_close_file(int fd)
 {
+	// printf("process_close_file begin, fd : %d \n", fd);
+
 	struct thread *curr = thread_current();
 	if (fd < 0 || fd > curr->next_fd)
 	{
 		return;
 	}
-
 	struct file **curr_fdt = curr->fdt;
-	struct file *curr_file = process_get_file(fd);
-
-	if (curr_file == NULL)
-	{
-		return;
-	}
-	file_close(curr_file);
 	curr_fdt[fd] = NULL;
 	curr->next_fd -= 1;
 }
@@ -269,6 +272,7 @@ duplicate_pte(uint64_t *pte, void *va, void *aux)
 static void
 __do_fork(void *aux)
 {
+	// printf("DO fork begin \n");
 	struct intr_frame if_;
 	struct thread *parent = (struct thread *)aux;
 	struct thread *current = thread_current();
@@ -314,8 +318,9 @@ __do_fork(void *aux)
 	// process_init();
 	// printf("__do_fork 3\n");
 
+	// printf("file dup begin \n");
 	struct file **parent_fdt = parent->fdt;
-	struct file **current_fdt = parent->fdt;
+	struct file **current_fdt = current->fdt;
 
 	int parent_max_fd = parent->next_fd;
 	for (int i = 2; i < parent_max_fd; i++)
@@ -496,11 +501,41 @@ void process_exit(void)
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
+	// printf("process_exit begin \n");
 
 	struct thread *curr = thread_current();
+	struct file *running_file = curr->running_file;
 
+	// for (int i = 0; i < 64; i++)
+	// {
+	// 	printf("curr fdt[%d] : %d \n", i, curr->fdt[i]);
+	// }
+
+	// printf("curr->next_fd : %d \n", curr->next_fd);
+
+	for (int i = 2; i < curr->next_fd; i++)
+	{
+		if (curr->fdt[i] != NULL)
+		{
+			close(i);
+			curr->fdt[i] = NULL;
+		}
+	}
+
+	// for (int i = 0; i < 64; i++)
+	// {
+	// 	printf("curr fdt[%d] : %d \n", i, curr->fdt[i]);
+	// }
+
+	if (running_file != NULL)
+	{
+		file_close(running_file);
+		curr->running_file = NULL;
+	}
+	// palloc_free_page(&curr->fdt);
 	sema_up(&curr->sema_wait);
 	sema_down(&curr->sema_exit);
+
 	process_cleanup();
 
 	return;
@@ -627,13 +662,18 @@ load(const char *file_name, struct intr_frame *if_)
 		goto done;
 	process_activate(thread_current());
 
+	lock_acquire(&filesys_lock);
 	/* Open executable file. */
 	file = filesys_open(file_name);
 	if (file == NULL)
 	{
+		lock_release(&filesys_lock);
 		printf("load: %s: open failed\n", file_name);
 		goto done;
 	}
+	thread_current()->running_file = file;
+	file_deny_write(file);
+	lock_release(&filesys_lock);
 
 	/* Read and verify executable header. */
 	if (file_read(file, &ehdr, sizeof ehdr) != sizeof ehdr || memcmp(ehdr.e_ident, "\177ELF\2\1\1", 7) || ehdr.e_type != 2 || ehdr.e_machine != 0x3E // amd64
@@ -715,7 +755,7 @@ load(const char *file_name, struct intr_frame *if_)
 
 done:
 	/* We arrive here whether the load is successful or not. */
-	file_close(file);
+	// file_close(file);
 	return success;
 }
 

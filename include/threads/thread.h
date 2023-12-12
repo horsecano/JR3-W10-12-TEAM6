@@ -140,7 +140,10 @@ struct thread
 
 	/* File Discriptor */
 	struct file *fdt[64];
+	// struct file **fdt;
+
 	int next_fd;
+	struct file *running_file;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */

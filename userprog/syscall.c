@@ -145,6 +145,7 @@ void halt(void)
 
 void exit(int status)
 {
+	// printf("exit begin \n");
 	struct thread *curr = thread_current();
 	curr->return_status = status;
 	printf("%s: exit(%d)\n", curr->name, status);
@@ -153,19 +154,29 @@ void exit(int status)
 
 int open(const char *file)
 {
+	// printf("open begin \n");
 	check_address(file);
 	if (file == NULL)
 	{
 		return -1;
 	}
+	// printf("open 1 \n");
 
 	struct file *curr_file = filesys_open(file);
 	if (curr_file == NULL)
 	{
 		return -1;
 	}
+	// printf("curr_file : %d \n", curr_file);
 
 	int fd = process_add_file(curr_file);
+	// printf("current fd : %d \n", fd);
+
+	if (fd == -1)
+	{
+		file_close(curr_file);
+	}
+
 	return fd;
 }
 
@@ -182,19 +193,24 @@ int filesize(int fd)
 
 int read(int fd, void *buffer, unsigned length)
 {
+	// printf("read bigen fd  : %d \n", fd);
+
 	check_address(buffer);
+
 	struct thread *curr = thread_current();
-	off_t read_bite;
+	int read_bite;
 	if (fd >= curr->next_fd)
 	{
 		exit(-1);
 	}
-
 	struct file *curr_file = process_get_file(fd);
+	// printf("read 1 \n");
 	if (curr_file == NULL)
 	{
+		// printf("curr_file -- NULL \n");
 		return -1;
 	}
+	// printf("read 2 \n");
 
 	if (fd == 0)
 	{
@@ -218,11 +234,14 @@ int read(int fd, void *buffer, unsigned length)
 	}
 	else
 	{
+		// printf("read 3 \n");
 		lock_acquire(&filesys_lock);
 		read_bite = file_read(curr_file, buffer, length);
 		lock_release(&filesys_lock);
 	}
 
+	// printf("read 4 \n");
+	// printf("read_bite : %d \n", read_bite);
 	return read_bite;
 }
 
@@ -268,6 +287,7 @@ bool create(const char *file, unsigned initial_size)
 
 bool remove(const char *file)
 {
+	// printf("remove begin \n");
 	check_address(file);
 	return filesys_remove(file);
 }
@@ -310,12 +330,24 @@ unsigned tell(int fd)
 
 void close(int fd)
 {
+	// printf("file close begin, fd : %d \n", fd);
 	struct thread *curr = thread_current();
-	if (fd > curr->next_fd)
+	struct file *file = process_get_file(fd);
+	// printf("file pointer addr : %d \n", file);
+
+	if (file == NULL)
 	{
 		return;
 	}
+
+	// printf("file process_close_file begin, fd : %d \n", fd);
 	process_close_file(fd);
+	if (fd == 0 || fd == 1)
+	{
+		return;
+	}
+	file_close(file);
+
 	return;
 }
 
@@ -341,5 +373,6 @@ int exec(const char *file)
 
 int sys_fork(const char *thread_name, struct intr_frame *f)
 {
+	// printf("sys_fork begin \n");
 	return process_fork(thread_name, f);
 }
