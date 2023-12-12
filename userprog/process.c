@@ -46,7 +46,7 @@ int process_add_file(struct file *f)
 	struct thread *curr = thread_current();
 	struct file **curr_fdt = curr->fdt;
 	int fd = curr->next_fd;
-	if (fd < 63)
+	if (fd < 64)
 	{
 		curr_fdt[fd] = f;
 		curr->next_fd += 1;
@@ -149,7 +149,6 @@ tid_t process_create_initd(const char *file_name)
 
 	char *save_ptr, *parsed_file_name;
 	parsed_file_name = strtok_r(file_name, " ", &save_ptr);
-
 	/* Create a new thread to execute FILE_NAME. */
 	tid = thread_create(parsed_file_name, PRI_DEFAULT, initd, fn_copy);
 	if (tid == TID_ERROR)
@@ -513,7 +512,7 @@ void process_exit(void)
 
 	// printf("curr->next_fd : %d \n", curr->next_fd);
 
-	for (int i = 2; i < curr->next_fd; i++)
+	for (int i = 2; i < 64; i++)
 	{
 		if (curr->fdt[i] != NULL)
 		{
@@ -521,11 +520,6 @@ void process_exit(void)
 			curr->fdt[i] = NULL;
 		}
 	}
-
-	// for (int i = 0; i < 64; i++)
-	// {
-	// 	printf("curr fdt[%d] : %d \n", i, curr->fdt[i]);
-	// }
 
 	if (running_file != NULL)
 	{

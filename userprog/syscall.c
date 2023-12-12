@@ -67,6 +67,7 @@ void syscall_init(void)
 /* The main system call interface */
 void syscall_handler(struct intr_frame *f UNUSED)
 {
+	// printf("syscall_call : %d \n",f->R.rax);
 	switch (f->R.rax)
 	{
 	case SYS_HALT:
@@ -149,6 +150,7 @@ void exit(int status)
 	struct thread *curr = thread_current();
 	curr->return_status = status;
 	printf("%s: exit(%d)\n", curr->name, status);
+
 	thread_exit();
 }
 
@@ -165,6 +167,8 @@ int open(const char *file)
 	struct file *curr_file = filesys_open(file);
 	if (curr_file == NULL)
 	{
+		// printf("curr_file NULL \n");
+
 		return -1;
 	}
 	// printf("curr_file : %d \n", curr_file);
