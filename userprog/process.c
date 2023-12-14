@@ -175,16 +175,13 @@ initd(void *f_name)
  * TID_ERROR if the thread cannot be created. */
 tid_t process_fork(const char *name, struct intr_frame *if_ UNUSED)
 {
-	// printf("process_fork 1 \n");
 	struct thread *curr = thread_current();
 	memcpy(&curr->parent_if, if_, sizeof(struct intr_frame));
 	// /* Clone current thread to new thread.*/
-	// printf("process_fork 2 \n");
 
 	tid_t tid = thread_create(name, PRI_DEFAULT, __do_fork, curr);
 	if (tid < 0)
 	{
-		// printf("bad tid! \n");
 		return TID_ERROR;
 	}
 
@@ -192,13 +189,9 @@ tid_t process_fork(const char *name, struct intr_frame *if_ UNUSED)
 
 	if (child == NULL)
 	{
-		// printf("bad child! \n");
 		return TID_ERROR;
 	}
-	// printf("process_fork 3 \n");
-
 	sema_down(&child->sema_fork);
-	// printf("process_fork 4 \n");
 
 	return tid;
 }
@@ -280,31 +273,24 @@ __do_fork(void *aux)
 	bool succ = true;
 	parent_if = &parent->parent_if;
 
-	// printf("__do_fork 1 \n");
 	/* 1. Read the cpu context to local stack. */
 	memcpy(&if_, parent_if, sizeof(struct intr_frame));
 	if_.R.rax = 0;
-	// printf("__do_fork 2 \n");
+
 	/* 2. Duplicate PT */
 	current->pml4 = pml4_create();
-	// printf("__do_fork 2 - 1\n");
 	if (current->pml4 == NULL)
 		goto error;
-	// printf("__do_fork 2 - 2\n");
 	process_activate(current);
-	// printf("__do_fork 2 - 3\n");
 
 #ifdef VM
 	supplemental_page_table_init(&current->spt);
 	if (!supplemental_page_table_copy(&current->spt, &parent->spt))
 		goto error;
 #else
-	// printf("__do_fork 2 - 4\n");
 	if (!pml4_for_each(parent->pml4, duplicate_pte, parent))
 	{
-		// printf("__do_fork 2 - 5\n");
 		goto error;
-		// printf("__do_fork 2 - 6\n");
 	}
 #endif
 
@@ -314,10 +300,6 @@ __do_fork(void *aux)
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
 
-	// process_init();
-	// printf("__do_fork 3\n");
-
-	// printf("file dup begin \n");
 	struct file **parent_fdt = parent->fdt;
 	struct file **current_fdt = current->fdt;
 
@@ -331,21 +313,17 @@ __do_fork(void *aux)
 		struct file *dup_file = file_duplicate(parent_fdt[i]);
 		current_fdt[i] = dup_file;
 	}
-	// printf("__do_fork 4\n");
 
 	current->next_fd = parent_max_fd;
 	sema_up(&current->sema_fork);
-	// printf("__do_fork 5\n");
 
 	process_init();
-	// printf("__do_fork 6\n");
 
 	/* Finally, switch to the newly created process. */
 	if (succ)
 		do_iret(&if_);
 error:
-	// printf("thread_err\n");
-	// thread_exit();
+
 	current->return_status = TID_ERROR;
 	sema_up(&current->sema_fork);
 	exit(TID_ERROR);
@@ -372,11 +350,6 @@ int process_exec(void *f_name)
 	{
 		return -1;
 	}
-
-	// for (int i = 0; argv[i] != NULL; i++)
-	// {
-	// 	printf("argv[%d] : %s \n", i, argv[i]);
-	// }
 
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
@@ -505,13 +478,6 @@ void process_exit(void)
 	struct thread *curr = thread_current();
 	struct file *running_file = curr->running_file;
 
-	// for (int i = 0; i < 64; i++)
-	// {
-	// 	printf("curr fdt[%d] : %d \n", i, curr->fdt[i]);
-	// }
-
-	// printf("curr->next_fd : %d \n", curr->next_fd);
-
 	for (int i = 2; i < 64; i++)
 	{
 		if (curr->fdt[i] != NULL)
@@ -526,7 +492,6 @@ void process_exit(void)
 		file_close(running_file);
 		curr->running_file = NULL;
 	}
-	// palloc_free_page(&curr->fdt);
 	sema_up(&curr->sema_wait);
 	sema_down(&curr->sema_exit);
 
@@ -749,7 +714,6 @@ load(const char *file_name, struct intr_frame *if_)
 
 done:
 	/* We arrive here whether the load is successful or not. */
-	// file_close(file);
 	return success;
 }
 

@@ -156,25 +156,19 @@ void exit(int status)
 
 int open(const char *file)
 {
-	// printf("open begin \n");
 	check_address(file);
 	if (file == NULL)
 	{
 		return -1;
 	}
-	// printf("open 1 \n");
 
 	struct file *curr_file = filesys_open(file);
 	if (curr_file == NULL)
 	{
-		// printf("curr_file NULL \n");
-
 		return -1;
 	}
-	// printf("curr_file : %d \n", curr_file);
 
 	int fd = process_add_file(curr_file);
-	// printf("current fd : %d \n", fd);
 
 	if (fd == -1)
 	{
@@ -377,6 +371,5 @@ int exec(const char *file)
 
 int sys_fork(const char *thread_name, struct intr_frame *f)
 {
-	// printf("sys_fork begin \n");
 	return process_fork(thread_name, f);
 }
