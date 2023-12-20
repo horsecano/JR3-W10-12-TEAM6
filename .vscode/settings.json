@@ -94,7 +94,16 @@
     "input.h": "c",
     "palloc.h": "c",
     "stdbool.h": "c",
-    "stddef.h": "c"
+    "stddef.h": "c",
+    "malloc.h": "c",
+    "vm.h": "c",
+    "uninit.h": "c",
+    "init.h": "c",
+    "ostream": "c",
+    "ratio": "c",
+    "tuple": "c",
+    "type_traits": "c"
   },
-  "C_Cpp.errorSquiggles": "disabled"
+  "C_Cpp.errorSquiggles": "disabled",
+  "C_Cpp.dimInactiveRegions": false
 }

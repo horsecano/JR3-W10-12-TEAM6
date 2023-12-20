@@ -25,7 +25,7 @@ static __inline int64_t syscall (uint64_t num_, uint64_t a1_, uint64_t a2_,
 			"syscall\n"
 			: "=a" (ret)
 			: "g" (num), "g" (a1), "g" (a2), "g" (a3), "g" (a4), "g" (a5), "g" (a6)
-			: "cc", "memory");ㅌㅌㅌㅌㅌㅌㅌ
+			: "cc", "memory");
 	return ret;
 }
 
