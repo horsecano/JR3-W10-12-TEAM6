@@ -3,7 +3,6 @@
 
 #include "threads/thread.h"
 #include "user/syscall.h"
-
 /*
 Project 3
 lazy_load_segment 시 인자로 전달 */
@@ -33,5 +32,7 @@ int remove_child_process(pid_t pid);
 int process_add_file(struct file* f);
 struct file* process_get_file(int fd);
 void process_close_file(int fd);
+
+bool lazy_load_segment(struct page* page, void* aux);
 
 #endif /* userprog/process.h */

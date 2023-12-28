@@ -2,29 +2,29 @@
    instructional operating system.  The Nachos copyright notice
    is reproduced in full below. */
 
-/* Copyright (c) 1992-1996 The Regents of the University of California.
-   All rights reserved.
+   /* Copyright (c) 1992-1996 The Regents of the University of California.
+	  All rights reserved.
 
-   Permission to use, copy, modify, and distribute this software
-   and its documentation for any purpose, without fee, and
-   without written agreement is hereby granted, provided that the
-   above copyright notice and the following two paragraphs appear
-   in all copies of this software.
+	  Permission to use, copy, modify, and distribute this software
+	  and its documentation for any purpose, without fee, and
+	  without written agreement is hereby granted, provided that the
+	  above copyright notice and the following two paragraphs appear
+	  in all copies of this software.
 
-   IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO
-   ANY PARTY FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR
-   CONSEQUENTIAL DAMAGES ARISING OUT OF THE USE OF THIS SOFTWARE
-   AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF CALIFORNIA
-   HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+	  IN NO EVENT SHALL THE UNIVERSITY OF CALIFORNIA BE LIABLE TO
+	  ANY PARTY FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR
+	  CONSEQUENTIAL DAMAGES ARISING OUT OF THE USE OF THIS SOFTWARE
+	  AND ITS DOCUMENTATION, EVEN IF THE UNIVERSITY OF CALIFORNIA
+	  HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-   THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY
-   WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-   WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-   PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS ON AN "AS IS"
-   BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
-   PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR
-   MODIFICATIONS.
-   */
+	  THE UNIVERSITY OF CALIFORNIA SPECIFICALLY DISCLAIMS ANY
+	  WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+	  WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+	  PURPOSE.  THE SOFTWARE PROVIDED HEREUNDER IS ON AN "AS IS"
+	  BASIS, AND THE UNIVERSITY OF CALIFORNIA HAS NO OBLIGATION TO
+	  PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR
+	  MODIFICATIONS.
+	  */
 
 #include "threads/synch.h"
 #include <stdio.h>
@@ -33,9 +33,9 @@
 #include "threads/thread.h"
 #include <debug.h>
 
-/* Priority Scheduling */
-bool cmp_sem_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
-bool d_elem_cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+	  /* Priority Scheduling */
+bool cmp_sem_priority(const struct list_elem* a, const struct list_elem* b, void* aux UNUSED);
+bool d_elem_cmp_priority(const struct list_elem* a, const struct list_elem* b, void* aux UNUSED);
 
 /* Initializes semaphore SEMA to VALUE.  A semaphore is a
    nonnegative integer along with two atomic operators for
@@ -46,7 +46,7 @@ bool d_elem_cmp_priority(const struct list_elem *a, const struct list_elem *b, v
 
    - up or "V": increment the value (and wake up one waiting
    thread, if any). */
-void sema_init(struct semaphore *sema, unsigned value)
+void sema_init(struct semaphore* sema, unsigned value)
 {
 	ASSERT(sema != NULL);
 
@@ -62,7 +62,7 @@ void sema_init(struct semaphore *sema, unsigned value)
    interrupts disabled, but if it sleeps then the next scheduled
    thread will probably turn interrupts back on. This is
    sema_down function. */
-void sema_down(struct semaphore *sema)
+void sema_down(struct semaphore* sema)
 {
 	enum intr_level old_level;
 
@@ -86,7 +86,7 @@ void sema_down(struct semaphore *sema)
    decremented, false otherwise.
 
    This function may be called from an interrupt handler. */
-bool sema_try_down(struct semaphore *sema)
+bool sema_try_down(struct semaphore* sema)
 {
 	enum intr_level old_level;
 	bool success;
@@ -110,7 +110,7 @@ bool sema_try_down(struct semaphore *sema)
    and wakes up one thread of those waiting for SEMA, if any.
 
    This function may be called from an interrupt handler. */
-void sema_up(struct semaphore *sema)
+void sema_up(struct semaphore* sema)
 {
 	enum intr_level old_level;
 	ASSERT(sema != NULL);
@@ -120,7 +120,7 @@ void sema_up(struct semaphore *sema)
 	{
 		list_sort(&sema->waiters, cmp_priority, NULL);
 		thread_unblock(list_entry(list_pop_front(&sema->waiters),
-								  struct thread, elem));
+			struct thread, elem));
 	}
 
 	sema->value++;
@@ -128,7 +128,7 @@ void sema_up(struct semaphore *sema)
 	intr_set_level(old_level);
 }
 
-static void sema_test_helper(void *sema_);
+static void sema_test_helper(void* sema_);
 
 /* Self-test for semaphores that makes control "ping-pong"
    between a pair of threads.  Insert calls to printf() to see
@@ -152,9 +152,9 @@ void sema_self_test(void)
 
 /* Thread function used by sema_self_test(). */
 static void
-sema_test_helper(void *sema_)
+sema_test_helper(void* sema_)
 {
-	struct semaphore *sema = sema_;
+	struct semaphore* sema = sema_;
 	int i;
 
 	for (i = 0; i < 10; i++)
@@ -179,7 +179,7 @@ sema_test_helper(void *sema_)
    acquire and release it.  When these restrictions prove
    onerous, it's a good sign that a semaphore should be used,
    instead of a lock. */
-void lock_init(struct lock *lock)
+void lock_init(struct lock* lock)
 {
 	ASSERT(lock != NULL);
 
@@ -196,8 +196,8 @@ void donate_priority(void)
 	 nested depth는 8로 제한
 	*/
 
-	struct lock *curr_lock = thread_current()->wait_on_lock;
-	struct thread *cmp_t = list_entry(list_begin(&curr_lock->holder->donations), struct thread, d_elem);
+	struct lock* curr_lock = thread_current()->wait_on_lock;
+	struct thread* cmp_t = list_entry(list_begin(&curr_lock->holder->donations), struct thread, d_elem);
 
 	while (curr_lock)
 	{
@@ -211,7 +211,7 @@ void donate_priority(void)
 }
 
 /* Priority Donation */
-bool d_elem_cmp_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+bool d_elem_cmp_priority(const struct list_elem* a, const struct list_elem* b, void* aux UNUSED)
 {
 	/*
 	TODO :
@@ -220,8 +220,8 @@ bool d_elem_cmp_priority(const struct list_elem *a, const struct list_elem *b, v
 	3. 우선 순위를 비교하여 블리언 값으로 리턴한다.
 	*/
 
-	struct thread *t_a;
-	struct thread *t_b;
+	struct thread* t_a;
+	struct thread* t_b;
 
 	t_a = list_entry(a, struct thread, d_elem);
 	t_b = list_entry(b, struct thread, d_elem);
@@ -237,7 +237,7 @@ bool d_elem_cmp_priority(const struct list_elem *a, const struct list_elem *b, v
    interrupt handler.  This function may be called with
    interrupts disabled, but interrupts will be turned back on if
    we need to sleep. */
-void lock_acquire(struct lock *lock)
+void lock_acquire(struct lock* lock)
 {
 
 	ASSERT(lock != NULL);
@@ -256,6 +256,8 @@ void lock_acquire(struct lock *lock)
 	{
 		thread_current()->wait_on_lock = lock;
 		list_insert_ordered(&lock->holder->donations, &thread_current()->d_elem, d_elem_cmp_priority, NULL);
+		// list_push_back(&lock->holder->donations, &thread_current()->d_elem);
+
 		donate_priority();
 	}
 
@@ -270,7 +272,7 @@ void lock_acquire(struct lock *lock)
 
    This function will not sleep, so it may be called within an
    interrupt handler. */
-bool lock_try_acquire(struct lock *lock)
+bool lock_try_acquire(struct lock* lock)
 {
 	bool success;
 
@@ -285,7 +287,7 @@ bool lock_try_acquire(struct lock *lock)
 
 void refresh_priority(void)
 {
-	struct thread *curr = thread_current();
+	struct thread* curr = thread_current();
 
 	if (list_empty(&curr->donations))
 	{
@@ -293,7 +295,7 @@ void refresh_priority(void)
 		return;
 	}
 
-	struct thread *max_t = list_entry(list_begin(&curr->donations), struct thread, d_elem);
+	struct thread* max_t = list_entry(list_begin(&curr->donations), struct thread, d_elem);
 	curr->priority = curr->origin_priority;
 
 	if (curr->priority < max_t->priority)
@@ -302,14 +304,14 @@ void refresh_priority(void)
 	}
 }
 
-void remove_with_lock(struct lock *lock)
+void remove_with_lock(struct lock* lock)
 {
 	/*
 	 lock을 해지 했을 때, waiters 리스트에서 해당 엔트리를 삭제 하기 위한 함수를 구현
 	 현재 쓰레드의 waiters 리스트를 확인하여 해지할 lock을 보유하고 있는 엔트리를 삭제
 	*/
-	struct thread *curr_t = thread_current();
-	struct list_elem *e;
+	struct thread* curr_t = thread_current();
+	struct list_elem* e;
 	// struct list_elem *e = list_begin(&curr_t->donations);
 
 	// while (e != list_end(&curr_t->donations))
@@ -324,7 +326,7 @@ void remove_with_lock(struct lock *lock)
 
 	for (e = list_begin(&curr_t->donations); e != list_end(&curr_t->donations);)
 	{
-		struct thread *lock_need_thread = list_entry(e, struct thread, d_elem);
+		struct thread* lock_need_thread = list_entry(e, struct thread, d_elem);
 		if (lock == lock_need_thread->wait_on_lock)
 		{
 			list_remove(e);
@@ -339,7 +341,7 @@ void remove_with_lock(struct lock *lock)
    An interrupt handler cannot acquire a lock, so it does not
    make sense to try to release a lock within an interrupt
    handler. */
-void lock_release(struct lock *lock)
+void lock_release(struct lock* lock)
 {
 	ASSERT(lock != NULL);
 	ASSERT(lock_held_by_current_thread(lock));
@@ -359,7 +361,7 @@ void lock_release(struct lock *lock)
 /* Returns true if the current thread holds LOCK, false
    otherwise.  (Note that testing whether some other thread holds
    a lock would be racy.) */
-bool lock_held_by_current_thread(const struct lock *lock)
+bool lock_held_by_current_thread(const struct lock* lock)
 {
 	ASSERT(lock != NULL);
 
@@ -376,14 +378,14 @@ struct semaphore_elem
 /* Initializes condition variable COND.  A condition variable
    allows one piece of code to signal a condition and cooperating
    code to receive the signal and act upon it. */
-void cond_init(struct condition *cond)
+void cond_init(struct condition* cond)
 {
 	ASSERT(cond != NULL);
 
 	list_init(&cond->waiters);
 }
 
-bool cmp_sem_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+bool cmp_sem_priority(const struct list_elem* a, const struct list_elem* b, void* aux UNUSED)
 {
 	/* TODO
 	고려 사항 : 전달 받은 인자는 semaphore_elem의 elem이다.
@@ -395,8 +397,8 @@ bool cmp_sem_priority(const struct list_elem *a, const struct list_elem *b, void
 	3. 첫번째 놈들끼리 우선 순위를 비교한다.
 	*/
 
-	struct semaphore_elem *a_sema_elem = list_entry(a, struct semaphore_elem, elem);
-	struct semaphore_elem *b_sema_elem = list_entry(b, struct semaphore_elem, elem);
+	struct semaphore_elem* a_sema_elem = list_entry(a, struct semaphore_elem, elem);
+	struct semaphore_elem* b_sema_elem = list_entry(b, struct semaphore_elem, elem);
 
 	if (list_empty(&a_sema_elem->semaphore.waiters))
 	{
@@ -407,11 +409,11 @@ bool cmp_sem_priority(const struct list_elem *a, const struct list_elem *b, void
 	{
 		return true;
 	}
-	struct list_elem *a_elem = list_begin(&(a_sema_elem->semaphore.waiters));
-	struct list_elem *b_elem = list_begin(&(b_sema_elem->semaphore.waiters));
+	struct list_elem* a_elem = list_begin(&(a_sema_elem->semaphore.waiters));
+	struct list_elem* b_elem = list_begin(&(b_sema_elem->semaphore.waiters));
 
-	struct thread *a_t = list_entry(a_elem, struct thread, elem);
-	struct thread *b_t = list_entry(b_elem, struct thread, elem);
+	struct thread* a_t = list_entry(a_elem, struct thread, elem);
+	struct thread* b_t = list_entry(b_elem, struct thread, elem);
 
 	return (a_t->priority) > (b_t->priority);
 }
@@ -436,7 +438,7 @@ bool cmp_sem_priority(const struct list_elem *a, const struct list_elem *b, void
    interrupt handler.  This function may be called with
    interrupts disabled, but interrupts will be turned back on if
    we need to sleep. */
-void cond_wait(struct condition *cond, struct lock *lock)
+void cond_wait(struct condition* cond, struct lock* lock)
 {
 	struct semaphore_elem waiter;
 
@@ -461,7 +463,7 @@ void cond_wait(struct condition *cond, struct lock *lock)
    An interrupt handler cannot acquire a lock, so it does not
    make sense to try to signal a condition variable within an
    interrupt handler. */
-void cond_signal(struct condition *cond, struct lock *lock UNUSED)
+void cond_signal(struct condition* cond, struct lock* lock UNUSED)
 {
 	ASSERT(cond != NULL);
 	ASSERT(lock != NULL);
@@ -472,8 +474,8 @@ void cond_signal(struct condition *cond, struct lock *lock UNUSED)
 	{
 		list_sort(&cond->waiters, cmp_sem_priority, NULL);
 		sema_up(&list_entry(list_pop_front(&cond->waiters),
-							struct semaphore_elem, elem)
-					 ->semaphore);
+			struct semaphore_elem, elem)
+			->semaphore);
 	}
 }
 
@@ -483,7 +485,7 @@ void cond_signal(struct condition *cond, struct lock *lock UNUSED)
    An interrupt handler cannot acquire a lock, so it does not
    make sense to try to signal a condition variable within an
    interrupt handler. */
-void cond_broadcast(struct condition *cond, struct lock *lock)
+void cond_broadcast(struct condition* cond, struct lock* lock)
 {
 	ASSERT(cond != NULL);
 	ASSERT(lock != NULL);

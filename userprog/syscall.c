@@ -14,26 +14,35 @@
 #include "filesys/file.h"
 #include "devices/input.h"
 #include "threads/palloc.h"
+#include "vm/vm.h"
+#include "vm/file.h"
 
 void syscall_entry(void);
-void syscall_handler(struct intr_frame *);
+void syscall_handler(struct intr_frame*);
 
-int check_address(void *addr);
+int check_address(void* addr);
 
 void halt(void) NO_RETURN;
 void exit(int status) NO_RETURN;
-int sys_fork(const char *thread_name, struct intr_frame *f);
-int exec(const char *file);
+int sys_fork(const char* thread_name, struct intr_frame* f);
+int exec(const char* file);
 int wait(pid_t);
-bool create(const char *file, unsigned initial_size);
-bool remove(const char *file);
-int open(const char *file);
+bool create(const char* file, unsigned initial_size);
+bool remove(const char* file);
+int open(const char* file);
 int filesize(int fd);
-int read(int fd, void *buffer, unsigned length);
-int write(int fd, const void *buffer, unsigned length);
+int read(int fd, void* buffer, unsigned length);
+int write(int fd, const void* buffer, unsigned length);
 void seek(int fd, unsigned position);
 unsigned tell(int fd);
 void close(int fd);
+
+/* Project 3 */
+void* mmap(void* addr, size_t length, int writable, int fd, off_t offset);
+void munmap(void* addr);
+void check_valid_buffer(void* buffer, unsigned size, void* rsp, bool to_write);
+
+
 
 /* System call.
  *
@@ -51,23 +60,28 @@ void close(int fd);
 void syscall_init(void)
 {
 	write_msr(MSR_STAR, ((uint64_t)SEL_UCSEG - 0x10) << 48 |
-							((uint64_t)SEL_KCSEG) << 32);
+		((uint64_t)SEL_KCSEG) << 32);
 	write_msr(MSR_LSTAR, (uint64_t)syscall_entry);
 
 	/* The interrupt service rountine should not serve any interrupts
 	 * until the syscall_entry swaps the userland stack to the kernel
 	 * mode stack. Therefore, we masked the FLAG_FL. */
 	write_msr(MSR_SYSCALL_MASK,
-			  FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
+		FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
 
 	/* File Discriptor */
 	lock_init(&filesys_lock);
 }
 
 /* The main system call interface */
-void syscall_handler(struct intr_frame *f UNUSED)
+void syscall_handler(struct intr_frame* f UNUSED)
 {
-	// printf("syscall_call : %d \n",f->R.rax);
+	// printf("syscall_call : %d \n", f->R.rax);
+	// printf("syscall_rsp : %p \n", f->rsp);
+// #ifdef VM
+	// thread_current()->user_rsp = f->rsp;
+// #endif
+
 	switch (f->R.rax)
 	{
 	case SYS_HALT:
@@ -79,7 +93,10 @@ void syscall_handler(struct intr_frame *f UNUSED)
 		break;
 
 	case SYS_FORK:
+		lock_acquire(&filesys_lock);
 		f->R.rax = sys_fork(f->R.rdi, f);
+		lock_release(&filesys_lock);
+
 		break;
 
 	case SYS_EXEC:
@@ -91,7 +108,10 @@ void syscall_handler(struct intr_frame *f UNUSED)
 		break;
 
 	case SYS_CREATE:
+		lock_acquire(&filesys_lock);
 		f->R.rax = create(f->R.rdi, f->R.rsi);
+		lock_release(&filesys_lock);
+
 		break;
 
 	case SYS_REMOVE:
@@ -107,10 +127,12 @@ void syscall_handler(struct intr_frame *f UNUSED)
 		break;
 
 	case SYS_READ:
+		check_valid_buffer(f->R.rsi, f->R.rdx, f->rsp, 1);
 		f->R.rax = read(f->R.rdi, f->R.rsi, f->R.rdx);
 		break;
 
 	case SYS_WRITE:
+		check_valid_buffer(f->R.rsi, f->R.rdx, f->rsp, 0);
 		f->R.rax = write(f->R.rdi, f->R.rsi, f->R.rdx);
 		break;
 
@@ -125,17 +147,103 @@ void syscall_handler(struct intr_frame *f UNUSED)
 	case SYS_CLOSE:
 		close(f->R.rdi);
 		break;
+
+	case SYS_MMAP:
+		f->R.rax = mmap(f->R.rdi, f->R.rsi, f->R.rdx, f->R.r10, f->R.r8);
+		break;
+
+	case SYS_MUNMAP:
+		munmap(f->R.rdi);
+		break;
 	}
 }
 
-/* System Call help Function */
-int check_address(void *addr)
+/* Project 3 */
+void* mmap(void* addr, size_t length, int writable, int fd, off_t offset)
 {
-	struct thread *curr = thread_current();
-	if (is_kernel_vaddr(addr) || pml4_get_page(curr->pml4, addr) == NULL)
+	struct thread* curr = thread_current();
+	if (addr == NULL || is_kernel_vaddr(addr))
+	{
+		// printf("invailed address!! failed!! \n");
+		return NULL;
+	}
+
+	if ((uint32_t)addr % PGSIZE != 0)
+	{
+		// printf("addr is not aligned, failed \n");
+		return NULL;
+	}
+
+
+	if ((uint32_t)offset % PGSIZE != 0)
+	{
+		// printf("addr is not aligned, failed \n");
+		return NULL;
+	}
+
+
+	if ((long long)length <= 0)
+	{
+		// printf("length is NULL, failed \n");
+		return NULL;
+	}
+
+	if (fd == 0 || fd == 1)
+	{
+		// printf("fd is 0 or 1, failed \n");
+		return NULL;
+	}
+
+	if (spt_find_page(&curr->spt, addr) != NULL)
+	{
+		// printf("current addr is already exist, failed \n");
+		return NULL;
+	}
+	struct file* file = process_get_file(fd);
+	if (file == NULL || file_length(file) == 0)
+	{
+		// printf("file is NULL! , failed \n");
+		return NULL;
+	}
+
+
+	return do_mmap(addr, length, writable, file, offset);
+}
+
+
+void munmap(void* addr)
+{
+	// printf("munmap is called \n");
+	// printf("addr : %p \n", addr);
+	check_address(addr);
+
+	return do_munmap(addr);
+}
+
+
+
+/* System Call help Function */
+int check_address(void* addr)
+{
+	// printf("read check_address  : %p \n", addr);
+	struct page* page;
+	struct thread* curr = thread_current();
+	if (is_kernel_vaddr(addr) || addr == NULL)
 	{
 		exit(-1);
 	}
+
+	// if (addr <= USER_STACK && addr >= USER_STACK_LIMIT)
+	// {
+	// 	// printf("stack pointer !! \n");
+	// 	if (addr < curr->user_rsp)
+	// 	{
+	// 		exit(-1);
+	// 	}
+
+	// }
+
+	return 1;
 }
 
 /* System Call Begin */
@@ -147,14 +255,14 @@ void halt(void)
 void exit(int status)
 {
 	// printf("exit begin \n");
-	struct thread *curr = thread_current();
+	struct thread* curr = thread_current();
 	curr->return_status = status;
 	printf("%s: exit(%d)\n", curr->name, status);
 
 	thread_exit();
 }
 
-int open(const char *file)
+int open(const char* file)
 {
 	check_address(file);
 	if (file == NULL)
@@ -162,7 +270,10 @@ int open(const char *file)
 		return -1;
 	}
 
-	struct file *curr_file = filesys_open(file);
+	lock_acquire(&filesys_lock);
+	struct file* curr_file = filesys_open(file);
+	lock_release(&filesys_lock);
+
 	if (curr_file == NULL)
 	{
 		return -1;
@@ -174,13 +285,13 @@ int open(const char *file)
 	{
 		file_close(curr_file);
 	}
-
+	// printf("open fd : %d \n", fd);
 	return fd;
 }
 
 int filesize(int fd)
 {
-	struct file *curr_file = process_get_file(fd);
+	struct file* curr_file = process_get_file(fd);
 	if (curr_file == NULL)
 	{
 		return -1;
@@ -189,19 +300,72 @@ int filesize(int fd)
 	return file_length(curr_file);
 }
 
-int read(int fd, void *buffer, unsigned length)
+void check_valid_buffer(void* buffer, unsigned size, void* rsp, bool to_write)
 {
+	if (buffer <= USER_STACK && buffer >= thread_current()->user_rsp)
+	{
+		return;
+	}
+
+	void* start_addr = pg_round_down(buffer);
+	void* end_addr = pg_round_down(buffer + size);
+	ASSERT(start_addr <= end_addr);
+
+	for (void* addr = end_addr; addr >= start_addr; addr -= PGSIZE)
+	{
+		struct page* pg = spt_find_page(&thread_current()->spt, addr);
+		if (pg == NULL)
+		{
+			exit(-1);
+		}
+		if (pg->writable == false && to_write == true)
+		{
+			exit(-1);
+		}
+	}
+}
+// printf("check vaild! \n");
+// 	for (int i = 0; i <= size; i++)
+// 	{
+// 		if (is_kernel_vaddr(buffer + i))
+// 		{
+// 			// printf("is_kernel_vaddr!!!! \n");
+// 			exit(-1);
+// 		}
+
+// 		struct page* page = spt_find_page(&thread_current()->spt, buffer + i);
+// 		if (page == NULL)
+// 		{
+// 			// printf("page is NULL! \n");
+// 			exit(-1);
+// 		}
+
+// 		if (to_write == true && page->writable == false)
+// 		{
+// 			// printf("check vaild! \n");
+// 			exit(-1);
+// 		}
+// 	}
+// }
+
+
+
+int read(int fd, void* buffer, unsigned length)
+{
+
 	// printf("read bigen fd  : %d \n", fd);
+	// printf("read buffer  : %p \n", buffer);
 
 	check_address(buffer);
 
-	struct thread *curr = thread_current();
-	int read_bite;
+	struct thread* curr = thread_current();
+	int read_byte;
+
 	if (fd >= curr->next_fd)
 	{
 		exit(-1);
 	}
-	struct file *curr_file = process_get_file(fd);
+	struct file* curr_file = process_get_file(fd);
 	// printf("read 1 \n");
 	if (curr_file == NULL)
 	{
@@ -213,7 +377,7 @@ int read(int fd, void *buffer, unsigned length)
 	if (fd == 0)
 	{
 		int i;
-		unsigned char *buf = buffer;
+		unsigned char* buf = buffer;
 		for (i = 0; i < length; i++)
 		{
 			char c = input_getc();
@@ -234,19 +398,20 @@ int read(int fd, void *buffer, unsigned length)
 	{
 		// printf("read 3 \n");
 		lock_acquire(&filesys_lock);
-		read_bite = file_read(curr_file, buffer, length);
+		read_byte = file_read(curr_file, buffer, length);
 		lock_release(&filesys_lock);
 	}
 
-	// printf("read 4 \n");
-	// printf("read_bite : %d \n", read_bite);
-	return read_bite;
+	// printf("read end -------- \n");
+	// printf("read_byte : %d \n", read_byte);
+	return read_byte;
 }
 
-int write(int fd, const void *buffer, unsigned length)
+int write(int fd, const void* buffer, unsigned length)
 {
 	check_address(buffer);
-	struct thread *curr = thread_current();
+
+	struct thread* curr = thread_current();
 	int write_byte;
 	if (fd >= curr->next_fd)
 	{
@@ -265,7 +430,7 @@ int write(int fd, const void *buffer, unsigned length)
 	else
 	{
 		lock_acquire(&filesys_lock);
-		struct file *f = curr->fdt[fd];
+		struct file* f = curr->fdt[fd];
 		write_byte = file_write(f, buffer, length);
 		lock_release(&filesys_lock);
 	}
@@ -273,7 +438,7 @@ int write(int fd, const void *buffer, unsigned length)
 	return write_byte;
 }
 
-bool create(const char *file, unsigned initial_size)
+bool create(const char* file, unsigned initial_size)
 {
 	check_address(file);
 	if (file == NULL)
@@ -283,7 +448,7 @@ bool create(const char *file, unsigned initial_size)
 	return filesys_create(file, initial_size);
 }
 
-bool remove(const char *file)
+bool remove(const char* file)
 {
 	// printf("remove begin \n");
 	check_address(file);
@@ -292,12 +457,12 @@ bool remove(const char *file)
 
 void seek(int fd, unsigned position)
 {
-	struct thread *curr = thread_current();
+	struct thread* curr = thread_current();
 	if (fd > curr->next_fd)
 	{
 		return;
 	}
-	struct file *curr_file = process_get_file(fd);
+	struct file* curr_file = process_get_file(fd);
 	if (curr_file == NULL)
 	{
 		return;
@@ -312,13 +477,13 @@ void seek(int fd, unsigned position)
 
 unsigned tell(int fd)
 {
-	struct thread *curr = thread_current();
+	struct thread* curr = thread_current();
 	if (fd > curr->next_fd)
 	{
 		return;
 	}
 
-	struct file *curr_file = process_get_file(fd);
+	struct file* curr_file = process_get_file(fd);
 	if (curr_file == NULL)
 	{
 		return -1;
@@ -329,8 +494,8 @@ unsigned tell(int fd)
 void close(int fd)
 {
 	// printf("file close begin, fd : %d \n", fd);
-	struct thread *curr = thread_current();
-	struct file *file = process_get_file(fd);
+	struct thread* curr = thread_current();
+	struct file* file = process_get_file(fd);
 	// printf("file pointer addr : %d \n", file);
 
 	if (file == NULL)
@@ -354,10 +519,10 @@ int wait(pid_t pid)
 	return process_wait(pid);
 }
 
-int exec(const char *file)
+int exec(const char* file)
 {
 	check_address(file);
-	char *fn_copy;
+	char* fn_copy;
 	fn_copy = palloc_get_page(PAL_ZERO);
 	if (fn_copy == NULL)
 		return TID_ERROR;
@@ -369,7 +534,7 @@ int exec(const char *file)
 	return 0;
 }
 
-int sys_fork(const char *thread_name, struct intr_frame *f)
+int sys_fork(const char* thread_name, struct intr_frame* f)
 {
 	return process_fork(thread_name, f);
 }

@@ -22,8 +22,10 @@
 #include "user/syscall.h"
 #include "vm/vm.h"
 
+
 #ifdef VM
 #include "vm/vm.h"
+#include "list.h"
 #endif
 
 static void process_cleanup(void);
@@ -31,6 +33,7 @@ static bool load(const char* file_name, struct intr_frame* if_);
 static void initd(void* f_name);
 static void __do_fork(void*);
 static bool arguement_stack(void** rsp, char** argv, int argc);
+bool lazy_load_segment(struct page* page, void* aux);
 
 /* User Program */
 struct thread* get_child_process(pid_t pid);
@@ -40,6 +43,8 @@ int remove_child_process(pid_t pid);
 int process_add_file(struct file* f);
 struct file* process_get_file(int fd);
 void process_close_file(int fd);
+
+
 
 /* 파일 객체에 대한 파일 디스크립터 생성 */
 int process_add_file(struct file* f)
@@ -258,6 +263,7 @@ duplicate_pte(uint64_t* pte, void* va, void* aux)
 }
 #endif
 
+
 /* A thread function that copies parent's execution context.
  * Hint) parent->tf does not hold the userland context of the process.
  *       That is, you are required to pass second argument of process_fork to
@@ -287,10 +293,14 @@ __do_fork(void* aux)
 #ifdef VM
 	supplemental_page_table_init(&current->spt);
 	if (!supplemental_page_table_copy(&current->spt, &parent->spt))
+	{
+		printf("do Fork error!!! \n");
 		goto error;
+	}
 #else
 	if (!pml4_for_each(parent->pml4, duplicate_pte, parent))
 	{
+		printf("do Fork pml4_for_each error!!! \n");
 		goto error;
 	}
 #endif
@@ -324,7 +334,6 @@ __do_fork(void* aux)
 	if (succ)
 		do_iret(&if_);
 error:
-
 	current->return_status = TID_ERROR;
 	sema_up(&current->sema_fork);
 	exit(TID_ERROR);
@@ -364,7 +373,11 @@ int process_exec(void* f_name)
 	process_cleanup();
 
 	/* And then load the binary */
+	lock_acquire(&filesys_lock);
 	success = load(argv[0], &_if);
+	lock_release(&filesys_lock);
+
+
 
 	/*
 	 - Project 2 -
@@ -456,10 +469,13 @@ void process_exit(void)
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
-	 // printf("process_exit begin \n");
+	 //  printf("process_exit begin \n");
 
 	struct thread* curr = thread_current();
+	struct supplemental_page_table* spt = &thread_current()->spt;
+
 	struct file* running_file = curr->running_file;
+
 
 	for (int i = 2; i < 64; i++)
 	{
@@ -475,8 +491,32 @@ void process_exit(void)
 		file_close(running_file);
 		curr->running_file = NULL;
 	}
+
+
+	struct list_elem* e;
+	for (e = list_begin(&spt->mapped_list); e != list_end(&spt->mapped_list);)
+	{
+		if (e == NULL)
+		{
+			break;
+		}
+		struct page* curr_page = list_entry(e, struct page, mapp_elem);
+		list_remove(&curr_page->mapp_elem);
+		destroy(curr_page);
+		if ((e = list_next(e)) == NULL)
+		{
+			break;
+		}
+	}
+
+
+	// printf("1process_exit tid : %s , %d \n", curr->name,  curr->tid);
 	sema_up(&curr->sema_wait);
+
+	// printf("2process_exit tid : %s , %d \n", curr->name,  curr->tid);
+
 	sema_down(&curr->sema_exit);
+	// printf("3process_exit tid : %s , %d \n", curr->name,  curr->tid);
 
 	process_cleanup();
 
@@ -490,7 +530,11 @@ process_cleanup(void)
 	struct thread* curr = thread_current();
 
 #ifdef VM
-	supplemental_page_table_kill(&curr->spt);
+	if (!list_empty(&curr->spt.page_list))
+	{
+		supplemental_page_table_kill(&curr->spt);
+	}
+
 #endif
 
 	uint64_t* pml4;
@@ -604,18 +648,18 @@ load(const char* file_name, struct intr_frame* if_)
 		goto done;
 	process_activate(thread_current());
 
-	lock_acquire(&filesys_lock);
+	// lock_acquire(&filesys_lock);
 	/* Open executable file. */
 	file = filesys_open(file_name);
 	if (file == NULL)
 	{
-		lock_release(&filesys_lock);
+		// lock_release(&filesys_lock);
 		printf("load: %s: open failed\n", file_name);
 		goto done;
 	}
 	thread_current()->running_file = file;
 	file_deny_write(file);
-	lock_release(&filesys_lock);
+	// lock_release(&filesys_lock);
 
 	/* Read and verify executable header. */
 	if (file_read(file, &ehdr, sizeof ehdr) != sizeof ehdr || memcmp(ehdr.e_ident, "\177ELF\2\1\1", 7) || ehdr.e_type != 2 || ehdr.e_machine != 0x3E // amd64
@@ -751,6 +795,7 @@ validate_segment(const struct Phdr* phdr, struct file* file)
 
  /* load() helpers. */
 static bool install_page(void* upage, void* kpage, bool writable);
+static bool lazy_load_segment(struct page* page, void* aux);
 
 /* Loads a segment starting at offset OFS in FILE at address
  * UPAGE.  In total, READ_BYTES + ZERO_BYTES bytes of virtual
@@ -867,36 +912,38 @@ install_page(void* upage, void* kpage, bool writable)
  * If you want to implement the function for only project 2, implement it on the
  * upper block. */
 
-static bool
-lazy_load_segment(struct page* page, void* aux)
+bool lazy_load_segment(struct page* page, void* aux)
 {
 	/* TODO: Load the segment from the file */
 	/* TODO: This called when the first page fault occurs on address VA. */
 	/* TODO: VA is available when calling this function. */
-	// printf("");
 	// printf("\n---- lazy_load_segment begin ---- \n");
 	struct load_segment_info* info = (struct load_segment_info*)aux;
 
-	// printf("\n");
-	// printf("-------- aux(get) info --------- \n");
+	// printf("\n-------- aux(get) info --------- \n");
 	// printf("file : %p\n", info->file);
 	// printf("off_t : %d\n", info->ofs);
 	// printf("upage : %p\n", info->upage);
 	// printf("read_bytes : %d\n", info->read_bytes);
 	// printf("zero_bytes : %d\n", info->zero_bytes);
 	// printf("writable : %d\n", info->writable);
-	// printf("---------------------- \n");
+	struct file* file = info->file;
+	off_t offset = info->ofs;
+	uint32_t read_bytes = info->read_bytes;
+	uint32_t zero_bytes = info->zero_bytes;
+	void* kav = page->frame->kva;
 
-	file_seek(info->file, info->ofs);
 
-	if (file_read(info->file, page->frame->kva, info->read_bytes) != (int)info->read_bytes)
+	file_seek(file, offset);
+	if (file_read(file, kav, read_bytes) != (int)read_bytes)
 	{
-		palloc_free_page(page->frame->kva);
+		printf("file_read is failed!! \n");
+		free(info);
 		return false;
 	}
-	memset(page->frame->kva + info->read_bytes, 0, info->zero_bytes);
-	// free(aux);
+	// printf("file_read is success!! \n");
 
+	memset(kav + read_bytes, 0, zero_bytes);
 	// printf("---- lazy_load_segment end ---- \n");
 
 	return true;
@@ -928,6 +975,17 @@ load_segment(struct file* file, off_t ofs, uint8_t* upage,
 	struct supplemental_page_table* spt = &thread_current()->spt;
 	struct page* page;
 
+
+	// printf("\n");
+	// printf("-------- load_segment info --------- \n");
+	// printf("file : %p\n", file);
+	// printf("off_t : %d\n", ofs);
+	// printf("upage : %p\n", upage);
+	// printf("read_bytes : %d\n", read_bytes);
+	// printf("zero_bytes : %d\n", zero_bytes);
+	// printf("writable : %d\n", writable);
+	// printf("---------------------- \n");
+
 	while (read_bytes > 0 || zero_bytes > 0)
 	{
 		/* Do calculate how to fill this page.
@@ -956,12 +1014,12 @@ load_segment(struct file* file, off_t ofs, uint8_t* upage,
 			return false;
 		}
 
-			info->file = file;
-			info->ofs = ofs;
-			info->upage = upage;
-			info->read_bytes = read_bytes;
-			info->zero_bytes = zero_bytes;
-			info->writable = writable;
+		info->file = file;
+		info->ofs = ofs;
+		info->upage = upage;
+		info->read_bytes = page_read_bytes;
+		info->zero_bytes = page_zero_bytes;
+		info->writable = writable;
 
 
 		// printf("\n");
@@ -977,6 +1035,7 @@ load_segment(struct file* file, off_t ofs, uint8_t* upage,
 
 		if (!vm_alloc_page_with_initializer(VM_ANON, upage, writable, lazy_load_segment, info))
 		{
+			printf("vm_alloc_page_with_initializer failed! \n");
 			free(info);
 			return false;
 		}
@@ -999,6 +1058,7 @@ setup_stack(struct intr_frame* if_)
 	// printf("\n ---- setup_stack begin ---- \n");
 	bool success = false;
 	void* stack_bottom = (void*)(((uint8_t*)USER_STACK) - PGSIZE);
+	struct thread* curr = thread_current();
 
 	// /* TODO: Map the stack on stack_bottom and claim the page immediately.
 	//  * TODO: If success, set the rsp accordingly.
@@ -1021,10 +1081,10 @@ setup_stack(struct intr_frame* if_)
 	// 	printf("setup_stack - spt_insert_page failed \n");
 	// 	return success;
 	// }
-	
+
 	if (!vm_alloc_page(VM_ANON | VM_MARKER_0, stack_bottom, true))
 	{
-		printf("setup_stack - vm_alloc_page failed \n");
+		// printf("setup_stack - vm_alloc_page failed \n");
 		return success;
 	}
 
@@ -1032,14 +1092,17 @@ setup_stack(struct intr_frame* if_)
 
 	if (!vm_claim_page(stack_bottom))
 	{
-		printf("setup_stack - vm_claim_page failed \n");
+		// printf("setup_stack - vm_claim_page failed \n");
 		return success;
 	}
 
 	if_->rsp = USER_STACK;
+	curr->user_rsp = stack_bottom;
+	// printf("stack_bottom ; %p \n", curr->user_rsp);
 	success = true;
 
 	// printf("---- setup_stack end, success : %d -----\n", success);
 	return success;
 }
 #endif /* VM */
+

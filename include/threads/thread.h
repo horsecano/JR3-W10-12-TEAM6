@@ -25,6 +25,8 @@ enum proccess_status
 	PROCESS_END
 };
 
+
+
 /* Thread identifier type.
    You can redefine this to whatever type you like. */
 typedef int tid_t;
@@ -86,12 +88,12 @@ typedef int tid_t;
  * the `magic' member of the running thread's `struct thread' is
  * set to THREAD_MAGIC.  Stack overflow will normally change this
  * value, triggering the assertion. */
-/* The `elem' member has a dual purpose.  It can be an element in
- * the run queue (thread.c), or it can be an element in a
- * semaphore wait list (synch.c).  It can be used these two ways
- * only because they are mutually exclusive: only a thread in the
- * ready state is on the run queue, whereas only a thread in the
- * blocked state is on a semaphore wait list. */
+ /* The `elem' member has a dual purpose.  It can be an element in
+  * the run queue (thread.c), or it can be an element in a
+  * semaphore wait list (synch.c).  It can be used these two ways
+  * only because they are mutually exclusive: only a thread in the
+  * ready state is on the run queue, whereas only a thread in the
+  * blocked state is on a semaphore wait list. */
 struct thread
 {
 	/* Owned by thread.c. */
@@ -108,7 +110,7 @@ struct thread
 
 	/* Priority Donation */
 	int origin_priority;
-	struct lock *wait_on_lock;
+	struct lock* wait_on_lock;
 	struct list donations;
 	struct list_elem d_elem;
 
@@ -130,7 +132,7 @@ struct thread
 	struct semaphore sema_exit; // process_exit을 위한 세마포어
 	struct semaphore sema_fork; // process_exit을 위한 세마포어
 
-	struct thread *parent;		 // 부모 쓰레드 포인터
+	struct thread* parent;		 // 부모 쓰레드 포인터
 	struct list child_list;		 // 자식 프로세스 리스트의 대한 필드
 	struct list_elem child_elem; // 자식 프로세스 리스트에 대한 원소
 	int return_status;
@@ -139,19 +141,20 @@ struct thread
 	bool waited; // 부모 쓰레드가 wait 중인지의 여부
 
 	/* File Discriptor */
-	struct file *fdt[64];
+	struct file* fdt[64];
 	// struct file **fdt;
 
 	int next_fd;
-	struct file *running_file;
+	struct file* running_file;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
-	uint64_t *pml4; /* Page map level 4 */
+	uint64_t* pml4; /* Page map level 4 */
 #endif
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */
 	struct supplemental_page_table spt;
+	void* user_rsp;
 #endif
 
 	/* Owned by thread.c. */
@@ -170,15 +173,15 @@ void thread_start(void);
 void thread_tick(void);
 void thread_print_stats(void);
 
-typedef void thread_func(void *aux);
-tid_t thread_create(const char *name, int priority, thread_func *, void *);
+typedef void thread_func(void* aux);
+tid_t thread_create(const char* name, int priority, thread_func*, void*);
 
 void thread_block(void);
-void thread_unblock(struct thread *);
+void thread_unblock(struct thread*);
 
-struct thread *thread_current(void);
+struct thread* thread_current(void);
 tid_t thread_tid(void);
-const char *thread_name(void);
+const char* thread_name(void);
 
 void thread_exit(void) NO_RETURN;
 void thread_yield(void);
@@ -191,13 +194,13 @@ void thread_set_nice(int);
 int thread_get_recent_cpu(void);
 int thread_get_load_avg(void);
 
-void do_iret(struct intr_frame *tf);
+void do_iret(struct intr_frame* tf);
 /* Alarm Clock */
 void thread_sleep(int64_t ticks);
 void thread_wakeup(int64_t global_tick);
 
 /* Priority Scheduling */
-bool cmp_priority(struct list_elem *a, struct list_elem *b, void *aux UNUSED);
+bool cmp_priority(struct list_elem* a, struct list_elem* b, void* aux UNUSED);
 void test_max_priority(void);
 
 /* Priority Donation */
@@ -205,12 +208,12 @@ void donate_priority(void);
 
 /// @brief
 /// @param lock
-void remove_with_lock(struct lock *lock);
+void remove_with_lock(struct lock* lock);
 void refresh_priority(void);
 
 /* Advanced Scheduler */
-void mlfqs_prioirty(struct thread *t);
-void mlfqs_recent_cpu(struct thread *t);
+void mlfqs_prioirty(struct thread* t);
+void mlfqs_recent_cpu(struct thread* t);
 void mlfqs_load_avg(void);
 void mlfqs_increment(void);
 void mlfqs_recalc(void);

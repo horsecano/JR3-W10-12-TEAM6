@@ -402,28 +402,20 @@ bool cmp_priority(struct list_elem* a, struct list_elem* b, void* aux UNUSED)
 /* Priority Schedule */
 void test_max_priority(void)
 {
-	/* TODO
-	1. Ready_list의 첫 번째와 현재 달리고 있는 쓰레드와 우선 순위를 비교한다.
-	2. 만약 Ready_list의 우선 순위가 더 높다면 현재 쓰레드는 Thread_yield()를 호출하면서 양보한다.
-
-	고려 사항 -> 인터럽트가 발생하면 안되는 구간이 어디인가?
-	*/
 	if (list_empty(&ready_list))
 	{
 		return;
 	}
 
-	// enum intr_level oldlevel;
-	// oldlevel = intr_disable();
-	// 인터럽트가 발생해서 현재 달리고 있는 쓰레드를 저장한 변수와 실제 달리고 있는 쓰레드가 다르면 안된다.
-
 	int curr_priority = thread_current()->priority;
 	struct thread* t = list_entry(list_begin(&ready_list), struct thread, elem);
 	if (t->priority > curr_priority)
 	{
-		thread_yield();
+		if (!intr_context())
+		{
+			thread_yield();
+		}
 	}
-	// intr_set_level(oldlevel);
 }
 
 /* Transitions a blocked thread T to the ready-to-run state.

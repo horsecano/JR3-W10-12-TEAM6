@@ -25,6 +25,12 @@ enum vm_type {
 	VM_MARKER_END = (1 << 31),
 };
 
+enum present_state
+{
+	PAGE_IS_OUT_OF_MEMORY = 0,
+	PAGE_IS_IN_MEMORY = 1,
+};
+
 #include "vm/uninit.h"
 #include "vm/anon.h"
 #include "vm/file.h"
@@ -34,6 +40,7 @@ enum vm_type {
 
 struct page_operations;
 struct thread;
+struct list mapped_list;
 
 #define VM_TYPE(type) ((type) & 7)
 
@@ -50,12 +57,14 @@ struct page {
 	/* Project 3*/
 	enum vm_type type;
 	bool writable;
-	struct file* file_point;
-	off_t ofs;
-	uint32_t read_bytes;
-	uint32_t zero_bytes;
-	bool is_loaded;
+	// struct file* file_point;
+	// off_t ofs;
+	// uint32_t read_bytes;
+	// uint32_t zero_bytes;
+	int mmap_cnt;
+	bool present_bit;
 	struct list_elem page_elem;
+	struct list_elem mapp_elem;
 
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
@@ -73,6 +82,8 @@ struct page {
 struct frame {
 	void* kva;
 	struct page* page;
+	struct list_elem frame_elem;
+	
 };
 
 /* The function table for page operations.
@@ -98,6 +109,7 @@ struct supplemental_page_table
 {
 	/* Project 3 */
 	struct list page_list;
+	struct list mapped_list;
 };
 
 #include "threads/thread.h"
